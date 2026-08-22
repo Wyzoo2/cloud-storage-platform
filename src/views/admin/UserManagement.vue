@@ -30,16 +30,16 @@
           <template #default="{ row }">
             <div class="quota-cell">
               <el-progress :percentage="quotaPercent(row)" :stroke-width="6" :show-text="false" :color="quotaPercent(row) > 80 ? 'var(--cs-danger)' : 'var(--cs-primary)'" />
-              <span class="quota-text">{{ formatSize(row.usedBytes) }} / {{ formatSize((row.quotaBytes || 0) + (row.extraBytes || 0) * 1024 * 1024 * 1024) }}</span>
+              <span class="quota-text">{{ formatSize(row.usedBytes) }} / {{ formatSize((row.quotaBytes || 0) + (row.extraBytes || 0)) }}</span>
             </div>
           </template>
         </el-table-column>
         <el-table-column label="增量额度" width="140">
           <template #default="{ row }">
             <div class="extra-cell">
-              <span v-if="row.extraBytes" class="extra-value">{{ row.extraBytes }} GB</span>
+              <span v-if="row.extraBytes" class="extra-value">{{ formatSize(row.extraBytes) }}</span>
               <span v-else class="text-muted">--</span>
-              <el-tag v-if="row.extraExpireAt" size="small" type="warning" style="margin-left: 4px;">到期 {{ formatExpireShort(row.extraExpireAt) }}</el-tag>
+
             </div>
           </template>
         </el-table-column>
@@ -148,8 +148,8 @@ function handleSizeChange() { currentPage.value = 1; loadUsers() }
 
 const normStatus = s => (s || '').toLowerCase()
 const isDisabled = row => normStatus(row.status) === 'disabled' || row.disabled === true
-function quotaPercent(row) { const total = (row.quotaBytes || 0) + (row.extraBytes || 0) * 1024 * 1024 * 1024; return total > 0 ? Math.round((row.usedBytes || 0) / total * 100) : 0 }
-function formatExpireShort(ts) { if (!ts) return ''; const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}` }
+function quotaPercent(row) { const total = (row.quotaBytes || 0) + (row.extraBytes || 0); return total > 0 ? Math.round((row.usedBytes || 0) / total * 100) : 0 }
+
 function statusTagType(s) { return { active: 'success', disabled: 'danger', locked: 'warning' }[normStatus(s)] || 'info' }
 function statusLabel(s) { return { active: '正常', disabled: '禁用', locked: '锁定' }[normStatus(s)] || s || '--' }
 function roleLabel(r) { return r === 'admin' ? '管理员' : '普通用户' }
