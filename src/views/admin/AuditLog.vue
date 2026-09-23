@@ -124,7 +124,7 @@ function handleReset() { filters.value = { username: '', action: '', dateRange: 
 // 后端实际动作值为小写（login / mkdir / user_manage 等），未收录的显示原文
 const actionMap = { login: '登录', logout: '登出', upload: '上传', download: '下载', delete: '删除', restore: '恢复', mkdir: '新建文件夹', create_folder: '新建文件夹', rename: '重命名', move: '移动', share: '分享', user_manage: '用户管理', billing_request: '增额申请', billing_approve: '审批通过', billing_reject: '审批驳回', billing_expire: '增量到期收回', billing_config: '计费配置变更', user_demote: '用户降级', quota_change: '配额变更', delete_force: '强制删除' }
 function actionLabel(a) { return actionMap[String(a || '').toLowerCase()] || a }
-function actionTagType(a) { const k = String(a || '').toLowerCase(); if (!k) return 'info'; if (k === 'user_manage' || k === 'billing_config' || k === 'quota_change') return 'warning'; if (['delete', 'logout', 'billing_expire'].includes(k)) return 'info'; if (k === 'login' || k === 'billing_approve') return 'success'; if (k === 'billing_reject' || k === 'user_demote' || k === 'delete_force') return 'danger'; return '' }
+function actionTagType(a) { const k = String(a || '').toLowerCase(); if (!k) return 'info'; if (k === 'user_manage' || k === 'billing_config' || k === 'quota_change') return 'warning'; if (['delete', 'logout', 'billing_expire'].includes(k)) return 'info'; if (k === 'login' || k === 'billing_approve') return 'success'; if (k === 'billing_reject' || k === 'user_demote' || k === 'delete_force') return 'danger'; return 'info' }
 // detail 是 JSON 字符串，格式化后展示；target 优先取 detail 里的 name（如目录名）
 function detailText(row) {
   if (!row.detail) return '--'
