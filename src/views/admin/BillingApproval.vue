@@ -5,14 +5,14 @@
     </div>
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-radio-group v-model="statusFilter" @change="fetchList">
+        <el-radio-group v-model="statusFilter" @change="handleFilterChange">
           <el-radio-button value="pending">待审批</el-radio-button>
           <el-radio-button value="approved">已通过</el-radio-button>
           <el-radio-button value="rejected">已驳回</el-radio-button>
           <el-radio-button value="all">全部</el-radio-button>
         </el-radio-group>
       </div>
-      <div class="toolbar-right"><el-tag>共 {{ list.length }} 条申请</el-tag></div>
+      <div class="toolbar-right"><el-tag>共 {{ total }} 条申请</el-tag></div>
     </div>
     <div class="cs-card table-card">
       <el-table :data="list" v-loading="loading" style="width:100%;min-width:820px">
@@ -49,6 +49,19 @@
       </el-table>
     </div>
 
+    <div class="pagination-bar">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="fetchList"
+        @size-change="fetchList"
+      />
+    </div>
+
     <!-- 驳回弹窗 -->
     <el-dialog v-model="rejectDialog.visible" title="驳回申请" width="min(420px, 92vw)" :close-on-click-modal="false">
       <div class="reject-info">申请人：{{ rejectDialog.record?.username }}　申请额度：{{ rejectDialog.record?.gbCount }} GB</div>
@@ -74,6 +87,9 @@ import { billingAdminApi } from '@/api'
 const loading = ref(false)
 const list = ref([])
 const statusFilter = ref('pending')
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
 const rejectDialog = ref({ visible: false, loading: false, reason: '', record: null })
 
 const statusTagType = (s) => ({ pending: 'warning', approved: 'success', rejected: 'danger' })[s] || 'info'
@@ -85,13 +101,16 @@ const formatDateTime = (ts) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+const handleFilterChange = () => { page.value = 1; fetchList() }
+
 const fetchList = async () => {
   loading.value = true
   try {
     // 契约 §4.2：status 缺省=pending，全部须显式传 all
-    const params = { status: statusFilter.value }
+    const params = { status: statusFilter.value, page: page.value, size: pageSize.value }
     const res = await billingAdminApi.listRequests(params)
     list.value = res.records || res.list || []
+    total.value = res.total || list.value.length
   } catch { ElMessage.error('加载列表失败') }
   finally { loading.value = false }
 }
@@ -145,5 +164,6 @@ onMounted(fetchList)
   .breadcrumb-bar { flex-wrap: wrap; gap: 12px; }
   .toolbar { gap: 10px; }
   .toolbar-left { flex: 1 1 100%; }
+  .pagination-bar { justify-content: center; }
 }
 </style>

@@ -14,7 +14,7 @@
       <div class="toolbar-right"><el-tag>共 {{ total }} 条记录</el-tag></div>
     </div>
     <div class="cs-card table-card">
-      <el-table :data="list" v-loading="loading" style="width:100%;min-width:820px" show-summary :summary-method="getSummary">
+      <el-table :data="list" v-loading="loading" style="width:100%;min-width:820px">
         <el-table-column prop="username" label="用户名" min-width="120" />
         <el-table-column prop="amountCents" label="缴费金额" width="130">
           <template #default="{ row }"><span class="amount-cell">¥{{ (row.amountCents / 100).toFixed(2) }}</span></template>
@@ -71,23 +71,6 @@ const formatDateTime = (ts) => {
   if (!ts) return '-'
   const d = new Date(ts)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-const getSummary = ({ columns, data }) => {
-  const sums = []
-  columns.forEach((col, idx) => {
-    if (idx === 0) { sums[idx] = '合计'; return }
-    if (col.property === 'amountCents') {
-      const cents = data.reduce((s, r) => s + (r.amountCents || 0), 0)
-      sums[idx] = `¥${(cents / 100).toFixed(2)}`
-    } else if (col.property === 'gbCount') {
-      const gb = data.reduce((s, r) => s + (r.gbCount || 0), 0)
-      sums[idx] = `${gb} GB`
-    } else {
-      sums[idx] = ''
-    }
-  })
-  return sums
 }
 
 const fetchList = async () => {
