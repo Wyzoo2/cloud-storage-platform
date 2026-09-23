@@ -26,17 +26,27 @@
           <template #default="{ row }"><el-tag :type="row.mustChangePassword ? 'warning' : 'success'" size="small">{{ row.mustChangePassword ? '是' : '否' }}</el-tag></template>
         </el-table-column>
         <el-table-column label="配额使用" width="200">
+          <!-- 分母改为 quotaBytes + extraBytes 总额度 -->
           <template #default="{ row }">
             <div class="quota-cell">
               <el-progress :percentage="quotaPercent(row)" :stroke-width="6" :show-text="false" :color="quotaPercent(row) > 80 ? 'var(--cs-danger)' : 'var(--cs-primary)'" />
-              <span class="quota-text">{{ formatSize(row.usedBytes) }} / {{ formatSize(row.quotaBytes) }}</span>
+              <span class="quota-text">{{ formatSize(row.usedBytes) }} / {{ formatSize((row.quotaBytes || 0) + (row.extraBytes || 0) * 1024 * 1024 * 1024) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="增量额度" width="140">
+          <template #default="{ row }">
+            <div class="extra-cell">
+              <span v-if="row.extraBytes" class="extra-value">{{ row.extraBytes }} GB</span>
+              <span v-else class="text-muted">--</span>
+              <el-tag v-if="row.extraExpireAt" size="small" type="warning" style="margin-left: 4px;">到期 {{ formatExpireShort(row.extraExpireAt) }}</el-tag>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="170">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <div class="op-actions">
               <el-button link type="primary" size="small" @click="handleEditQuota(row)"><el-icon><Edit /></el-icon>编辑</el-button>
@@ -44,6 +54,8 @@
                 <el-icon><component :is="isDisabled(row) ? 'CircleCheck' : 'CircleClose'" /></el-icon>{{ isDisabled(row) ? '启用' : '禁用' }}
               </el-button>
               <el-button link type="info" size="small" @click="handleResetPassword(row)"><el-icon><Key /></el-icon>重置密码</el-button>
+              <el-button v-if="row.role === 'user'" link type="success" size="small" :disabled="isDisabled(row)" @click="handlePromote(row)"><el-icon><SortUp /></el-icon>升级</el-button>
+              <el-button v-if="row.role === 'admin' && String(row.id) !== userStore.userId" link type="danger" size="small" @click="handleDemote(row)"><el-icon><SortDown /></el-icon>降级</el-button>
             </div>
           </template>
         </el-table-column>
@@ -60,7 +72,12 @@
             <template #append><el-button @click="generatePassword">随机生成</el-button></template>
           </el-input>
         </el-form-item>
-        <el-form-item label="配额(GB)"><el-input-number v-model="createForm.quota" :min="1" :max="100" :step="5" /></el-form-item>
+        <el-form-item label="配额(GB)">
+          <div style="width:100%">
+            <el-input-number :model-value="freeQuotaGb" disabled style="width: 100%" />
+            <div class="quota-hint">由计费配置的免费额度决定（R3 快照制），仅影响此后新注册用户</div>
+          </div>
+        </el-form-item>
         <el-form-item label="角色">
           <el-select v-model="createForm.role" style="width: 100%">
             <el-option label="普通用户" value="user" /><el-option label="管理员" value="admin" />
@@ -73,11 +90,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Search, SortDown, SortUp } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { adminApi } from '@/api'
+import { adminApi, billingAdminApi } from '@/api'
 import { formatSize, formatDate } from '@/utils/file'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const users = ref([])
 const total = ref(0)
@@ -88,7 +108,7 @@ const searchText = ref('')
 const statusFilter = ref('')
 const showCreateDialog = ref(false)
 const creating = ref(false)
-const createForm = ref({ username: '', password: '', quota: 20, role: 'user' })
+const createForm = ref({ username: '', password: '', role: 'user' })
 
 // 搜索防抖（后端 keyword 服务端搜索）
 let searchTimer = null
@@ -98,7 +118,16 @@ watch(searchText, () => {
 })
 watch(statusFilter, () => { currentPage.value = 1; loadUsers() })
 
-onMounted(() => loadUsers())
+// 创建用户配额 = 计费配置免费额度（R3 快照制），只读展示
+const freeQuotaBytes = ref(0)
+function loadBillingConfig() {
+  billingAdminApi.getConfig().then(res => {
+    freeQuotaBytes.value = res.freeBytes || 0
+  }).catch(() => {})
+}
+const freeQuotaGb = computed(() => freeQuotaBytes.value ? +(freeQuotaBytes.value / 1024 / 1024 / 1024).toFixed(1) : 20)
+
+onMounted(() => { loadUsers(); loadBillingConfig() })
 
 async function loadUsers() {
   loading.value = true
@@ -119,7 +148,8 @@ function handleSizeChange() { currentPage.value = 1; loadUsers() }
 
 const normStatus = s => (s || '').toLowerCase()
 const isDisabled = row => normStatus(row.status) === 'disabled' || row.disabled === true
-function quotaPercent(row) { return row.quotaBytes > 0 ? Math.round((row.usedBytes || 0) / row.quotaBytes * 100) : 0 }
+function quotaPercent(row) { const total = (row.quotaBytes || 0) + (row.extraBytes || 0) * 1024 * 1024 * 1024; return total > 0 ? Math.round((row.usedBytes || 0) / total * 100) : 0 }
+function formatExpireShort(ts) { if (!ts) return ''; const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}` }
 function statusTagType(s) { return { active: 'success', disabled: 'danger', locked: 'warning' }[normStatus(s)] || 'info' }
 function statusLabel(s) { return { active: '正常', disabled: '禁用', locked: '锁定' }[normStatus(s)] || s || '--' }
 function roleLabel(r) { return r === 'admin' ? '管理员' : '普通用户' }
@@ -161,19 +191,47 @@ function generatePassword() {
   createForm.value.password = pwd
 }
 
+// 升级为管理员（通用 PATCH 接口传 role；升级不触发 A3 保护，不吊销 token）
+function handlePromote(row) {
+  ElMessageBox.confirm(
+    `确定将用户 "${row.username}" 升级为管理员？升级后该用户拥有全站管理权限。`,
+    '确认升级',
+    { confirmButtonText: '确认升级', cancelButtonText: '取消', type: 'warning' }
+  ).then(() => {
+    adminApi.updateUser(row.id, { role: 'admin' }).then(() => {
+      ElMessage.success('已升级为管理员')
+      loadUsers()
+    }).catch(() => {})
+  }).catch(() => {})
+}
+
+// A 组补充：管理员降级为普通用户（后端 A3 保护：不可降级自己 / 保留最后一位 active 管理员）
+function handleDemote(row) {
+  ElMessageBox.confirm(
+    `确定将用户 "${row.username}" 从管理员降级为普通用户？降级后该用户需重新登录。`,
+    '确认降级',
+    { confirmButtonText: '确认降级', cancelButtonText: '取消', type: 'warning' }
+  ).then(() => {
+    adminApi.demoteUser(row.id).then(() => {
+      ElMessage.success('已降级为普通用户')
+      loadUsers()
+    }).catch(() => {})
+  }).catch(() => {})
+}
+
 async function handleCreate() {
   if (!createForm.value.username.trim()) { ElMessage.error('请输入用户名'); return }
   creating.value = true
   try {
     const data = {
       username: createForm.value.username.trim(),
-      quotaBytes: Math.round(createForm.value.quota * 1024 * 1024 * 1024),
+      quotaBytes: freeQuotaBytes.value,
       role: createForm.value.role || 'user'
     }
     if (createForm.value.password) data.initialPassword = createForm.value.password
     const res = await adminApi.createUser(data)
     showCreateDialog.value = false
-    createForm.value = { username: '', password: '', quota: 20, role: 'user' }
+    createForm.value = { username: '', password: '', role: 'user' }
     const pwd = res?.password || res?.initialPassword || ''
     if (pwd) ElMessageBox.alert(`初始密码：${pwd}`, '用户创建成功', { confirmButtonText: '我已记下' })
     else ElMessage.success('用户创建成功')
@@ -190,6 +248,7 @@ async function handleCreate() {
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0; }
 .quota-cell { display: flex; flex-direction: column; gap: 4px; }
 .quota-text { font-size: 12px; color: var(--cs-text-tertiary); }
+.quota-hint { font-size: 12px; color: var(--cs-text-tertiary); line-height: 1.5; margin-top: 2px; }
 .table-card { overflow-x: auto; }
 .op-actions { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .op-actions .el-button { margin-left: 0; }
@@ -197,6 +256,9 @@ async function handleCreate() {
 .op-actions .el-button .el-icon + span { margin-left: 4px; }
 .toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .pagination-bar { display: flex; justify-content: flex-end; margin-top: 20px; }
+.extra-cell { display: flex; align-items: center; gap: 2px; }
+.extra-value { font-weight: 600; color: var(--cs-warning, #e6a23c); font-size: 13px; }
+.text-muted { color: var(--cs-text-tertiary); font-size: 13px; }
 @media (max-width: 768px) {
   .breadcrumb-bar { flex-wrap: wrap; gap: 12px; }
   .toolbar { gap: 10px; }

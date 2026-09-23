@@ -54,6 +54,8 @@ export const adminApi = {
   updateUser: (id, data) => request.patch(`/admin/users/${id}`, data),
   // 重置密码 → { password: 'xxx' }（新密码）
   resetPassword: id => request.post(`/admin/users/${id}/reset-password`),
+  // 降级为普通用户（A3 保护：不可降级自己 / 至少保留一位 active 管理员）
+  demoteUser: id => request.post(`/admin/users/${id}/demote`),
   // ===== 管理端统计（R-C09）=====
   // 平台用量总览 → { totalQuotaBytes, usedBytes, remainingBytes, userCount }
   statsOverview: () => request.get('/admin/stats/overview'),
@@ -79,6 +81,34 @@ export const uploadApi = {
   // 获取 5 分钟预签名下载地址 → { url }
   getDownloadUrl: fileId => request.get(`/files/${fileId}/download`),
   getPreviewUrl: fileId => request.get(`/files/${fileId}/download`, { params: { inline: true } })
+}
+
+// ===== 计费管理（admin）=====
+export const billingAdminApi = {
+  // 获取计费配置
+  getConfig: () => request.get('/admin/billing/config'),
+  // 更新计费配置：{ freeBytes?, pricePerGbMonthCents? }
+  updateConfig: data => request.patch('/admin/billing/config', data),
+  // 增额申请列表（管理端审批）：{ status?, page, size } → { list, total }
+  listRequests: params => request.get('/admin/billing/increase-requests', { params }),
+  // 审批通过
+  approve: id => request.post(`/admin/billing/increase-requests/${id}/approve`),
+  // 审批驳回：{ reason? }
+  reject: (id, data) => request.post(`/admin/billing/increase-requests/${id}/reject`, data),
+  // 缴费台账：{ userId?, status?, page, size } → { list, total }
+  listRecords: params => request.get('/admin/billing/records', { params })
+}
+
+// ===== 计费（用户端）=====
+export const billingApi = {
+  // 获取计费配置（公开，需登录）
+  getConfig: () => request.get('/billing/config'),
+  // 获取当前用户额度信息
+  getQuota: () => request.get('/billing/quota'),
+  // 提交增额申请：{ gbCount, remark? }
+  createRequest: data => request.post('/billing/increase-requests', data),
+  // 我的申请列表：{ page, size } → { list, total }
+  listMyRequests: params => request.get('/billing/increase-requests', { params })
 }
 
 // ===== 传输任务列表（后端持久化任务记录）=====
