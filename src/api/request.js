@@ -2,7 +2,9 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
-const request = axios.create({ baseURL: '/api', timeout: 30000 })
+// 桌面端打包注入 VITE_API_BASE（绝对地址直连后端）；Web 端保持 /api 走代理
+const baseURL = import.meta.env.VITE_API_BASE || '/api'
+const request = axios.create({ baseURL, timeout: 30000 })
 
 // 请求拦截：注入认证头（后端从 Bearer token 解析当前用户，无需再传 X-User-Id / X-User-Role）
 request.interceptors.request.use(config => {
@@ -32,7 +34,7 @@ request.interceptors.response.use(
       const refreshToken = localStorage.getItem('cs-refresh-token')
       if (refreshToken && !refreshing && !error.config?._retried) {
         refreshing = true
-        return axios.post('/api/auth/refresh', { refreshToken }).then(res => {
+        return axios.post(`${baseURL}/auth/refresh`, { refreshToken }).then(res => {
           const d = res.data?.data || {}
           if (!d.accessToken) throw new Error('refresh failed')
           localStorage.setItem('cs-token', d.accessToken)

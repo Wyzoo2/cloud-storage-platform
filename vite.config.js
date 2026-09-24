@@ -2,7 +2,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // 桌面端打包（--mode desktop）资源用相对路径，Electron 以 file:// 加载 dist；Web 端保持根路径
+  base: mode === 'desktop' ? './' : '/',
   plugins: [vue()],
   resolve: {
     alias: {
@@ -26,4 +28,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))
