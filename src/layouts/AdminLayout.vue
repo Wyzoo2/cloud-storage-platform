@@ -10,6 +10,12 @@
         <el-menu-item index="/admin/dashboard"><el-icon><DataAnalysis /></el-icon><template #title>统计大盘</template></el-menu-item>
         <el-menu-item index="/admin/users"><el-icon><UserFilled /></el-icon><template #title>用户管理</template></el-menu-item>
         <el-menu-item index="/admin/logs"><el-icon><Document /></el-icon><template #title>审计日志</template></el-menu-item>
+        <el-sub-menu index="billing">
+          <template #title><el-icon><Wallet /></el-icon><span>计费管理</span></template>
+          <el-menu-item index="/admin/billing/config">计费配置</el-menu-item>
+          <el-menu-item index="/admin/billing/approval">增额审批</el-menu-item>
+          <el-menu-item index="/admin/billing/records">缴费台账</el-menu-item>
+        </el-sub-menu>
       </el-menu>
       <div class="sidebar-bottom">
         <el-button text @click="router.push('/')" class="back-btn"><el-icon><Back /></el-icon><span v-show="!isCollapsed">返回用户端</span></el-button>
@@ -124,6 +130,18 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 .sidebar-menu .el-menu-item:hover { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }
 .sidebar-menu .el-menu-item.is-active { background: var(--cs-sidebar-active-bg); color: var(--cs-sidebar-active-text); font-weight: 600; }
 .sidebar-menu .el-menu-item.is-active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 2px; background: #ffffff; }
+/* 子菜单标题（scoped 穿透） */
+.sidebar-menu :deep(.el-sub-menu__title) { position: relative; border-radius: var(--cs-radius); margin-bottom: 4px; height: 44px; line-height: 44px; transition: all 0.2s ease; color: var(--cs-sidebar-text); }
+.sidebar-menu :deep(.el-sub-menu__title:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }
+.sidebar-menu :deep(.el-sub-menu__title .el-icon) { color: var(--cs-sidebar-text); }
+.sidebar-menu :deep(.el-sub-menu__title:hover .el-icon) { color: var(--cs-sidebar-active-text); }
+/* 子菜单展开后的容器背景 */
+.sidebar-menu :deep(.el-sub-menu .el-menu) { background: transparent !important; padding: 0; }
+/* 子菜单内部项 */
+.sidebar-menu :deep(.el-sub-menu .el-menu-item) { padding-left: 52px !important; min-width: auto; height: 38px; line-height: 38px; font-size: 13px; color: var(--cs-sidebar-text); opacity: 0.85; }
+.sidebar-menu :deep(.el-sub-menu .el-menu-item:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); opacity: 1; }
+.sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active) { background: var(--cs-sidebar-active-bg); color: var(--cs-sidebar-active-text); font-weight: 600; opacity: 1; }
+.sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active::before) { height: 14px; }
 .sidebar-bottom { padding: 12px 16px; border-top: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
 .back-btn { width: 100%; justify-content: flex-start; color: var(--cs-sidebar-text) !important; }
 .back-btn:hover { color: var(--cs-sidebar-active-text) !important; }
@@ -168,4 +186,14 @@ function handleLogout() { userStore.logout(); router.push('/login') }
   .header-right { gap: 8px; }
   .user-name { display: none; }
 }
+</style>
+
+<style>
+/* 子菜单弹出层（侧边栏折叠时）— 必须全局，因弹出层挂载在 body 下，不在 .sidebar-menu 内部 */
+.el-menu--popup-container { background: #1a1f2e !important; }
+.el-menu--popup-container .el-menu { background: #1a1f2e !important; min-width: 160px; padding: 4px; border: 1px solid rgba(255,255,255,0.08); }
+.el-menu--popup-container .el-menu .el-menu-item { color: rgba(255,255,255,0.65) !important; }
+.el-menu--popup-container .el-menu .el-menu-item:hover { background: rgba(255,255,255,0.08) !important; color: #ffffff !important; }
+.el-menu--popup-container .el-menu .el-menu-item.is-active { background: rgba(255,255,255,0.12) !important; color: #ffffff !important; font-weight: 600; }
+.el-menu--popup-container .el-menu .el-menu-item:focus { background: rgba(255,255,255,0.08) !important; }
 </style>

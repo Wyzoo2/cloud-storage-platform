@@ -7,6 +7,7 @@ const routes = [
       { path: 'files', name: 'FileList', component: () => import('@/views/user/FileList.vue'), meta: { title: '我的文件' } },
       { path: 'transfers', name: 'Transfers', component: () => import('@/views/user/Transfers.vue'), meta: { title: '传输任务' } },
       { path: 'recycle', name: 'RecycleBin', component: () => import('@/views/user/RecycleBin.vue'), meta: { title: '回收站' } },
+      { path: 'billing', name: 'BillingIncrease', component: () => import('@/views/user/BillingIncrease.vue'), meta: { title: '增额申请' } },
       { path: 'profile', name: 'PersonalCenter', component: () => import('@/views/user/PersonalCenter.vue'), meta: { title: '个人中心' } }
     ]
   },
@@ -14,7 +15,10 @@ const routes = [
     children: [
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/admin/Dashboard.vue'), meta: { title: '统计大盘' } },
       { path: 'users', name: 'UserManagement', component: () => import('@/views/admin/UserManagement.vue'), meta: { title: '用户管理' } },
-      { path: 'logs', name: 'AuditLog', component: () => import('@/views/admin/AuditLog.vue'), meta: { title: '审计日志' } }
+      { path: 'logs', name: 'AuditLog', component: () => import('@/views/admin/AuditLog.vue'), meta: { title: '审计日志' } },
+      { path: 'billing/config', name: 'BillingConfig', component: () => import('@/views/admin/BillingConfig.vue'), meta: { title: '计费配置' } },
+      { path: 'billing/approval', name: 'BillingApproval', component: () => import('@/views/admin/BillingApproval.vue'), meta: { title: '增额审批' } },
+      { path: 'billing/records', name: 'BillingRecords', component: () => import('@/views/admin/BillingRecords.vue'), meta: { title: '缴费台账' } }
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/login' }
