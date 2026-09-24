@@ -9,15 +9,23 @@
         <el-menu-item index="/files"><el-icon><FolderOpened /></el-icon><template #title>我的文件</template></el-menu-item>
         <el-menu-item index="/transfers"><el-icon><Upload /></el-icon><template #title>传输任务</template></el-menu-item>
         <el-menu-item index="/recycle"><el-icon><Delete /></el-icon><template #title>回收站</template></el-menu-item>
+        <el-menu-item index="/billing"><el-icon><Wallet /></el-icon><template #title>增额申请</template></el-menu-item>
         <el-menu-item index="/profile"><el-icon><User /></el-icon><template #title>个人中心</template></el-menu-item>
       </el-menu>
       <div class="sidebar-bottom">
         <div class="quota-info" v-show="!isCollapsed">
           <div class="quota-label">
             <span>存储空间</span>
-            <span class="quota-value">{{ formatSize(userStore.quota.used) }} / {{ formatSize(userStore.quota.total) }}</span>
+            <span class="quota-value">{{ formatSize(quotaUsed) }} / {{ quotaTotalText }}</span>
           </div>
-          <el-progress :percentage="quotaPercent" :stroke-width="6" :show-text="false" :color="quotaPercent > 80 ? 'var(--cs-danger)' : 'var(--cs-primary)'" />
+          <div class="quota-bar">
+            <div class="qbar-seg qbar-free" :style="{ width: freeSegPct + '%' }">
+              <div class="qbar-fill qbar-free-fill" :style="{ width: freeUsedPct + '%' }"></div>
+            </div>
+            <div class="qbar-seg qbar-extra" :style="{ width: extraSegPct + '%' }">
+              <div class="qbar-fill qbar-extra-fill" :style="{ width: extraUsedPct + '%' }"></div>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -71,6 +79,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElNotification } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useBillingStore } from '@/stores/billing'
 import { listUploadTasks } from '@/utils/uploadTaskStore'
 import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
@@ -78,13 +87,25 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const billingStore = useBillingStore()
 
 const isMobile = ref(false)
 const mobileMenuOpen = ref(false)
 
 // 移动端抽屉里菜单始终展开；桌面/平板的折叠状态由 appStore 控制
 const isCollapsed = computed(() => !isMobile.value && appStore.sidebarCollapsed)
-const quotaPercent = computed(() => userStore.quota.total > 0 ? Math.round(userStore.quota.used / userStore.quota.total * 100) : 0)
+// 侧边栏可用总额度：优先计费数据（免费+增量），未就绪时回退到登录时的配额快照
+const quotaTotal = computed(() => billingStore.totalBytes || userStore.quota.total)
+const quotaUsed = computed(() => billingStore.totalBytes ? billingStore.quota.usedBytes : userStore.quota.used)
+// 侧边栏额度条分段：蓝色=免费额度，绿色=增值额度；优先消耗免费额度
+const freeBytes = computed(() => billingStore.totalBytes > 0 ? (billingStore.quota.freeBytes || 0) : quotaTotal.value)
+const extraBytes = computed(() => billingStore.totalBytes > 0 ? (billingStore.quota.extraBytes || 0) : 0)
+const freeSegPct = computed(() => quotaTotal.value > 0 ? (freeBytes.value / quotaTotal.value) * 100 : 0)
+const extraSegPct = computed(() => quotaTotal.value > 0 ? (extraBytes.value / quotaTotal.value) * 100 : 0)
+const freeUsedPct = computed(() => freeBytes.value > 0 ? (Math.min(quotaUsed.value, freeBytes.value) / freeBytes.value) * 100 : 0)
+const extraUsedPct = computed(() => extraBytes.value > 0 ? Math.min(100, (Math.max(0, quotaUsed.value - freeBytes.value) / extraBytes.value) * 100) : 0)
+// 侧边栏额度文案：有增额时显示「免费 + 增值」，无增额时只显示总额度
+const quotaTotalText = computed(() => extraBytes.value > 0 ? `${formatSize(freeBytes.value)} + ${formatSize(extraBytes.value)}` : formatSize(quotaTotal.value))
 
 function updateViewport() {
   isMobile.value = window.innerWidth <= 768
@@ -95,6 +116,7 @@ onMounted(() => {
   updateViewport()
   notifyPendingTransfers()
   userStore.loadProfile().catch(() => {})
+  billingStore.loadQuota().catch(() => {})
   // 平板端（≤1024 且 >768）默认折叠侧边栏
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
     appStore.sidebarCollapsed = true
@@ -157,6 +179,13 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 .sidebar-bottom { padding: 12px 16px; border-top: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
 .quota-info .quota-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--cs-sidebar-text); margin-bottom: 6px; }
 .quota-value { color: var(--cs-sidebar-active-text); font-weight: 500; }
+.quota-bar { display: flex; gap: 2px; height: 6px; border-radius: 4px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
+.qbar-seg { position: relative; height: 100%; overflow: hidden; }
+.qbar-free { background: rgba(59, 130, 246, 0.3); }
+.qbar-extra { background: rgba(34, 197, 94, 0.3); }
+.qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
+.qbar-free-fill { background: #60a5fa; }
+.qbar-extra-fill { background: #4ade80; }
 .layout-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .header { height: var(--cs-header-height); background: var(--cs-header-bg); border-bottom: 1px solid var(--cs-header-border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
 .header-left { display: flex; align-items: center; }
