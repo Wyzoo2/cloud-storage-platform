@@ -213,9 +213,9 @@ async function handleSubmit() {
     await billing.submitIncrease(n, remark.value.trim())
     ElMessage.success('申请已提交，待管理员审批')
     remark.value = ''
-    await billing.loadRequests(page.value, pageSize.value, true)
+    await billing.loadRequests(page.value, pageSize.value)
     // 提交成功后把全量申请状态同步进「已知状态」，这样下次进入时若已被审批即可弹窗
-    writeKnownStatus(billing.requestAll)
+    writeKnownStatus(await billing.loadRequestsForCheck())
   } catch (e) {
     ElMessage.error(e?.message || '提交失败')
   } finally {

@@ -13,7 +13,6 @@ export const useBillingStore = defineStore('billing', () => {
   const requests = ref([])
   const reqTotal = ref(0)
   const reqPages = ref(0)
-  const requestAll = ref(null) // 全量缓存：翻页时从缓存切片，避免每次翻页都重新请求后端
   const loading = ref(false)
 
   // 可用总额度 = 免费 + 增量
@@ -27,20 +26,16 @@ export const useBillingStore = defineStore('billing', () => {
     quota.value = await billingApi.getQuota()
   }
 
-  async function loadRequests(page = 1, size = 5, force = false) {
-    // 后端 /billing/increase-requests 的 page/size 目前未真正按页返回（records 每次都返回全量）。
-    // 这里一次性拉全量后由前端切片；force=true（提交后刷新）或首次加载时才重新请求，翻页走缓存秒切。
+  async function loadRequests(page = 1, size = 5) {
+    // 后端已支持真分页：page 从 1 起，返回 { records, total, size, current, pages }，每次只拉当前页
     loading.value = true
     try {
-      if (force || requestAll.value == null) {
-        const r = await billingApi.listIncrease({ page: 1, size: 500 })
-        const all = Array.isArray(r) ? r : (r.records || [])
-        const rawTotal = (r && r.total != null) ? Number(r.total) : 0
-        requestAll.value = all
-        reqTotal.value = Math.max(all.length, rawTotal)
-      }
-      requests.value = requestAll.value.slice((page - 1) * size, page * size)
-      reqPages.value = Math.ceil(reqTotal.value / size) || 0
+      const r = await billingApi.listIncrease({ page, size })
+      const data = Array.isArray(r) ? { records: r } : (r || {})
+      const list = data.records || []
+      requests.value = list
+      reqTotal.value = Number(data.total ?? list.length)
+      reqPages.value = Number(data.pages ?? Math.ceil(reqTotal.value / size)) || 0
     } finally {
       loading.value = false
     }
@@ -56,5 +51,5 @@ export const useBillingStore = defineStore('billing', () => {
     return billingApi.createIncrease({ gbCount, remark })
   }
 
-  return { config, quota, totalBytes, requests, reqTotal, reqPages, requestAll, loading, loadConfig, loadQuota, loadRequests, loadRequestsForCheck, submitIncrease }
+  return { config, quota, totalBytes, requests, reqTotal, reqPages, loading, loadConfig, loadQuota, loadRequests, loadRequestsForCheck, submitIncrease }
 })
