@@ -35,7 +35,14 @@
           <div class="qseg-val">{{ formatSize(billing.totalBytes) }}</div>
         </div>
       </div>
-      <el-progress :percentage="quotaPercent" :stroke-width="10" :show-text="false" :color="quotaPercent > 80 ? 'var(--cs-danger)' : 'var(--cs-primary)'" />
+      <div class="quota-bar">
+        <div class="qbar-seg qbar-free" :style="{ width: freeSegPct + '%' }">
+          <div class="qbar-fill qbar-free-fill" :style="{ width: freeUsedPct + '%' }"></div>
+        </div>
+        <div class="qbar-seg qbar-extra" :style="{ width: extraSegPct + '%' }">
+          <div class="qbar-fill qbar-extra-fill" :style="{ width: extraUsedPct + '%' }"></div>
+        </div>
+      </div>
     </div>
 
     <!-- 申请表单 -->
@@ -189,7 +196,10 @@ async function checkStatusChange() {
 }
 
 const previewAmount = computed(() => ((gbCount.value * billing.config.pricePerGbMonthCents) / 100).toFixed(2))
-const quotaPercent = computed(() => billing.totalBytes > 0 ? Math.min(100, Math.round(billing.quota.usedBytes / billing.totalBytes * 100)) : 0)
+const freeSegPct = computed(() => billing.totalBytes > 0 ? (billing.quota.freeBytes / billing.totalBytes) * 100 : 0)
+const extraSegPct = computed(() => billing.totalBytes > 0 ? (billing.quota.extraBytes / billing.totalBytes) * 100 : 0)
+const freeUsedPct = computed(() => billing.quota.freeBytes > 0 ? (Math.min(billing.quota.usedBytes, billing.quota.freeBytes) / billing.quota.freeBytes) * 100 : 0)
+const extraUsedPct = computed(() => billing.quota.extraBytes > 0 ? Math.min(100, (Math.max(0, billing.quota.usedBytes - billing.quota.freeBytes) / billing.quota.extraBytes) * 100) : 0)
 
 function formatMoney(cents) { return '¥' + ((cents || 0) / 100).toFixed(2) }
 function statusType(s) { return s === 'approved' ? 'success' : s === 'rejected' ? 'danger' : 'warning' }
@@ -203,9 +213,9 @@ async function handleSubmit() {
     await billing.submitIncrease(n, remark.value.trim())
     ElMessage.success('申请已提交，待管理员审批')
     remark.value = ''
-    await billing.loadRequests(page.value, pageSize.value, true)
+    await billing.loadRequests(page.value, pageSize.value)
     // 提交成功后把全量申请状态同步进「已知状态」，这样下次进入时若已被审批即可弹窗
-    writeKnownStatus(billing.requestAll)
+    writeKnownStatus(await billing.loadRequestsForCheck())
   } catch (e) {
     ElMessage.error(e?.message || '提交失败')
   } finally {
@@ -236,6 +246,13 @@ function onPageChange(p) {
 .qseg-label { font-size: 12px; color: var(--cs-text-tertiary); margin-bottom: 6px; }
 .qseg-val { font-size: 20px; font-weight: 600; color: var(--cs-text-primary); }
 .qseg-sub { font-size: 12px; color: var(--cs-text-secondary); margin-top: 4px; }
+.quota-bar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--cs-bg-hover); }
+.qbar-seg { position: relative; height: 100%; overflow: hidden; }
+.qbar-free { background: #dbeafe; }
+.qbar-extra { background: #d1fae5; }
+.qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
+.qbar-free-fill { background: #3b82f6; }
+.qbar-extra-fill { background: #22c55e; }
 .apply-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .apply-field { display: flex; align-items: center; gap: 12px; }
 .apply-label { font-size: 14px; color: var(--cs-text-secondary); white-space: nowrap; }

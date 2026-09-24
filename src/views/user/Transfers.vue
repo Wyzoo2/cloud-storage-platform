@@ -20,7 +20,7 @@
       </div>
 
       <!-- 任务行 -->
-      <div v-for="t in pagedTasks" v-else :key="t.id" class="task-row">
+      <div v-for="t in sortedTasks" v-else :key="t.id" class="task-row">
         <div class="task-row__icon" :style="iconStyle(t)">
           <el-icon :size="20"><component :is="getIconName(t)" /></el-icon>
         </div>
@@ -37,12 +37,17 @@
               <span class="progress-fill" :class="{ 'is-paused': stateOf(t) === 'paused' }" :style="{ width: transfer.percent(t) + '%' }"></span>
             </span>
             <span class="progress-pct" :class="{ 'is-paused': stateOf(t) === 'paused' }">{{ transfer.percent(t) }}%</span>
-            <span v-if="stateOf(t) === 'paused'" class="progress-hint">已暂停</span>
+            <span v-if="stateOf(t) === 'paused'" class="progress-hint">{{ t.source === 'remote' ? '待续传' : '已暂停' }}</span>
           </div>
 
           <!-- 等待上传 -->
           <div v-else-if="stateOf(t) === 'waiting'" class="task-row__status is-waiting">
             <el-icon><Clock /></el-icon><span>{{ transfer.hashing[t.id] != null ? '正在校验指纹 ' + transfer.hashing[t.id] + '%' : '等待上传' }}</span>
+          </div>
+
+          <!-- 已放弃 -->
+          <div v-else-if="stateOf(t) === 'aborted'" class="task-row__status is-aborted">
+            <el-icon><CircleCloseFilled /></el-icon><span>已放弃</span>
           </div>
 
           <!-- 已完成 -->
@@ -73,12 +78,12 @@
       </div>
     </div>
 
-    <!-- 分页：默认每页 20 条 -->
+    <!-- 分页：后端分页（默认每页 10 条，翻页请求后端当前页） -->
     <el-pagination
       v-if="transfer.tasks.length > 0"
-      v-model:current-page="page"
-      v-model:page-size="pageSize"
-      :total="transfer.tasks.length"
+      v-model:current-page="transfer.page"
+      v-model:page-size="transfer.pageSize"
+      :total="transfer.listTotal"
       :page-sizes="[10, 20, 50, 100]"
       layout="total, sizes, prev, pager, next"
       class="task-pagination"
@@ -87,7 +92,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { formatSize, extToType } from '@/utils/file'
 import { useTransferStore } from '@/stores/transfer'
 
@@ -108,25 +113,25 @@ function iconStyle(t) {
 
 // ---- 统计与排序：进行中在前，已完成在后 ----
 const doneCount = computed(() => transfer.tasks.filter(t => transfer.stateOf(t) === 'done').length)
-const ORDER = { uploading: 0, waiting: 1, paused: 2, done: 3 }
+const ORDER = { uploading: 0, waiting: 1, paused: 2, done: 3, aborted: 4 }
 const sortedTasks = computed(() => {
   return [...transfer.tasks].sort((a, b) => {
     const oa = ORDER[transfer.stateOf(a)] ?? 9
     const ob = ORDER[transfer.stateOf(b)] ?? 9
     if (oa !== ob) return oa - ob
     // 未完成任务按创建时间锁定位置（进度刷新不再换位）；已完成按完成时间，刚完成的在前
-    const key = t => t.status === 'done' ? (t.updatedAt || 0) : (t.createdAt || t.updatedAt || 0)
+    const key = t => t.status === 'done' ? (t.updatedAt || t.createdAt || 0) : (t.createdAt || t.updatedAt || 0)
     return key(b) - key(a)
   })
 })
 
-// ---- 分页：默认每页 20 条 ----
-const page = ref(1)
-const pageSize = ref(10)
-const pagedTasks = computed(() => sortedTasks.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
-watch(() => transfer.tasks.length, () => { // 任务数变化（清空/删除）时页码超界自动回退
-  const maxPage = Math.max(1, Math.ceil(transfer.tasks.length / pageSize.value))
-  if (page.value > maxPage) page.value = maxPage
+// ---- 分页：后端分页（页码/条数由 store 管理，翻页时 store 发请求） ----
+
+
+
+watch(() => transfer.tasks.length, () => { // 列表清空（删完/清空已完成）时回退第一页
+  if (!transfer.tasks.length && transfer.page > 1) transfer.page = 1
+
 })
 </script>
 
@@ -204,6 +209,7 @@ watch(() => transfer.tasks.length, () => { // 任务数变化（清空/删除）
 .task-row__status { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; margin-top: 7px; }
 .task-row__status.is-waiting { color: var(--cs-text-tertiary); }
 .task-row__status.is-done { color: var(--cs-success); }
+.task-row__status.is-aborted { color: var(--cs-text-tertiary); }
 
 /* ===== 操作按钮 ===== */
 .task-row__ops { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }

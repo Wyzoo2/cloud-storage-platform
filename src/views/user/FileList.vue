@@ -568,8 +568,8 @@ function uploadSortKey(f) {
   if (f.status === 'success') return 1
   return 2
 }
-watch(uploadFileList, (list) => {
-  const sorted = [...list].sort((a, b) => uploadSortKey(a) - uploadSortKey(b))
+watch(uploadFileList, (_list) => {
+  return; // ⚠ 禁用排序重排，避免 el-upload 内部重建文件列表导致重复 on-change
   for (let i = 0; i < list.length; i++) {
     if (sorted[i].uid !== list[i].uid) {
       uploadFileList.value = sorted
@@ -579,6 +579,8 @@ watch(uploadFileList, (list) => {
 }, { deep: true })
 
 function onUploadChange(file, fileList) {
+  const raw = file.raw || file
+  if (uploadBatch.some(f => (f.raw || f) === raw)) return // raw File 引用去重：比 uid 更稳定，el-upload 重排时 uid 可能变但原始 File 对象不变
   uploadBatch.push(file)
   if (uploadBatchFlush) return
   uploadBatchFlush = setTimeout(() => {
@@ -591,6 +593,10 @@ function onUploadChange(file, fileList) {
 
 // 单次选择 ≤5 个；上传列表（含已完成）同时最多 10 个，超出自动顶替最早的完成记录
 function settleUploadBatch(batch, fileList) {
+  // 按 uid 去重（兜底：防止任何原因导致的重复加入）
+  const seen = new Set()
+  batch = batch.filter(f => { const raw = f.raw || f; if (seen.has(raw)) return false; seen.add(raw); return true })
+  if (!batch.length) return
   // 单次上限：一次最多 5 个，超出部分从末尾截掉（保留前 5 个，不整批拦截）
   let droppedCount = 0
   if (batch.length > 5) {
@@ -624,7 +630,16 @@ function settleUploadBatch(batch, fileList) {
 // el-upload 自定义上传：分片上传 + 秒传 + 断点续传（统一走 transfer store，支持暂停/实时进度）
 function doUpload(options) {
   // 注意：element-plus http-request 的 options.file 就是原始 File（带 uid），没有 .raw 属性
+
   const raw = options.file
+  // 底层防护：同一 File 对象并发调用只放行第一次
+  if (!doUpload._active) doUpload._active = new Set()
+  if (doUpload._active.has(raw)) {
+    console.warn('[doUpload] 重复调用已拦截:', raw?.name)
+    uploadRef.value?.handleRemove(options.file)
+    return
+  }
+  doUpload._active.add(raw)
   const name = raw?.name || '未命名文件'
   if (!raw) {
     ElMessage.error('读取文件失败，请重新选择')
@@ -664,6 +679,7 @@ function doUpload(options) {
     })
     .finally(() => {
       activeUploads.value--
+      doUpload._active?.delete(raw)
     })
 }
 

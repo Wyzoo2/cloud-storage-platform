@@ -80,7 +80,7 @@ import { ElNotification } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useBillingStore } from '@/stores/billing'
-import { listUploadTasks } from '@/utils/uploadTaskStore'
+import { fetchUploadTasks } from '@/utils/uploadTaskStore'
 import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
 const route = useRoute()
@@ -128,12 +128,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updateViewport)
 })
 
-function notifyPendingTransfers() {
-  const pending = listUploadTasks().filter(t => t.status !== 'done') // 已完成记录仅保留展示，不算待续传
+async function notifyPendingTransfers() {
+  const res = await fetchUploadTasks({ status: 'uploading', page: 0, size: 10 }).catch(() => null)
+  const pending = res?.list || [] // 后端视角：仅 uploading 视为未完成（done/aborted 不算待续传）
   if (!pending.length) return
   ElNotification({
     title: '有未完成的传输任务',
-    message: `检测到 ${pending.length} 个上传任务未完成，可在左侧「传输任务」中继续。`,
+    message: `检测到 ${res?.total ?? pending.length} 个上传任务未完成，可在左侧「传输任务」中继续。`,
     type: 'warning',
     duration: 6000
   })
