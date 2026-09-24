@@ -80,7 +80,7 @@ import { ElNotification } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useBillingStore } from '@/stores/billing'
-import { listUploadTasks } from '@/utils/uploadTaskStore'
+import { fetchUploadTasks } from '@/utils/uploadTaskStore'
 import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
 const route = useRoute()
