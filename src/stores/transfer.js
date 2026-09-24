@@ -6,10 +6,12 @@ import { getCachedFile, removeCachedFile, cacheFile } from '@/utils/uploadFileSt
 import { uploadFile } from '@/utils/upload'
 import { uploadApi } from '@/api'
 import { useFileStore } from '@/stores/file'
+import { useBillingStore } from '@/stores/billing'
 
 // 传输任务运行时状态：本地运行态（waiting/uploading/paused）+ 后端任务记录（GET /uploads）
 // 任务 id 统一用 init 返回的 sessionId（后端自增 id）；哈希阶段 tmpKey / 秒传 instant-id 为本地临时 id
 export const useTransferStore = defineStore('transfer', () => {
+  const billingStore = useBillingStore() // 顶层实例化：上传完成的异步回调里直接引用闭包实例
   const localTasks = ref([])   // 本地运行态任务（内存）：waiting → uploading → done / paused
   const remoteTasks = ref([])  // 后端任务记录（当前页）：uploading / done / aborted
   const page = ref(1)          // 当前页码（UI 1 起；接口从 0 起，查询传 page - 1）
@@ -131,6 +133,13 @@ export const useTransferStore = defineStore('transfer', () => {
     } catch { /* 文件 store 未就绪忽略 */ }
   }
 
+  // 上传落库后刷新计费额度：侧边栏进度条依赖 billingStore.quota.usedBytes，需实时同步
+  function notifyQuota() {
+    try {
+      billingStore.loadQuota().catch(() => {})
+    } catch { /* billing store 未就绪忽略 */ }
+  }
+
   // 统一上传入口：首次上传与续传共用。
   // 维护本地运行态（可暂停）、实时进度；完成后本地置 done，由后端记录接管持久化
   function upload(file, parentId, handlers = {}) {
@@ -211,6 +220,7 @@ export const useTransferStore = defineStore('transfer', () => {
           if (matched) removeLocal(doneId) // 后端记录接管展示
         }
         notifyFileList(parentId) // 上传完成刷新文件列表（当前目录=目标目录时）
+        notifyQuota() // 上传完成刷新计费额度（侧边栏进度条实时更新）
         ElMessage.success(res.instant ? `「${file.name}」秒传成功` : `「${file.name}」上传成功`)
         return res
       })
