@@ -32,6 +32,8 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem('cs-role', u.role || 'user')
     if (u.id != null) localStorage.setItem('cs-user-id', String(u.id))
     setMustChangeFlag(!!u.mustChangePassword)
+    // 通知根组件（App.vue）做一次桌面端自动更新检查
+    document.dispatchEvent(new CustomEvent('app:logged-in'))
   }
 
   // 从 /auth/profile 刷新配额与强制改密标志（后端实测返回 { id, username, role, quotaBytes, usedBytes, mustChangePassword }）

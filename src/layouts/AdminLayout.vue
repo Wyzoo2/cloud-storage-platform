@@ -16,6 +16,7 @@
           <el-menu-item index="/admin/billing/approval">增额审批</el-menu-item>
           <el-menu-item index="/admin/billing/records">缴费台账</el-menu-item>
         </el-sub-menu>
+        <el-menu-item index="/admin/app-release"><el-icon><Upload /></el-icon><template #title>版本发布</template></el-menu-item>
       </el-menu>
       <div class="sidebar-bottom">
         <el-button text @click="router.push('/')" class="back-btn"><el-icon><Back /></el-icon><span v-show="!isCollapsed">返回用户端</span></el-button>
@@ -37,6 +38,7 @@
           </el-icon>
         </div>
         <div class="header-right">
+          <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
           <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
             <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
           </button>
@@ -76,6 +78,9 @@ const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
+// 桌面端（Electron）才显示检查更新按钮；点击触发 App.vue 的手动检查
+const isDesktop = !!window.desktop?.isDesktop
+const checkForUpdate = () => document.dispatchEvent(new CustomEvent('app:check-update'))
 const isMobile = ref(false)
 const mobileMenuOpen = ref(false)
 
@@ -89,7 +94,7 @@ function updateViewport() {
 
 onMounted(() => {
   updateViewport()
-  // 平板端（≤1024 且 >768）默认折叠侧边栏
+  // 平板端（<=1024 且 >768）默认折叠侧边栏
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
     appStore.sidebarCollapsed = true
   }
@@ -189,11 +194,7 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 </style>
 
 <style>
-/* 子菜单弹出层（侧边栏折叠时）— 必须全局，因弹出层挂载在 body 下，不在 .sidebar-menu 内部 */
+/* 子菜单弹出层（侧边栏折叠时）——必须全局，因弹出层挂载在 body 下，不在 .sidebar-menu 内部 */
 .el-menu--popup-container { background: #1a1f2e !important; }
 .el-menu--popup-container .el-menu { background: #1a1f2e !important; min-width: 160px; padding: 4px; border: 1px solid rgba(255,255,255,0.08); }
-.el-menu--popup-container .el-menu .el-menu-item { color: rgba(255,255,255,0.65) !important; }
-.el-menu--popup-container .el-menu .el-menu-item:hover { background: rgba(255,255,255,0.08) !important; color: #ffffff !important; }
-.el-menu--popup-container .el-menu .el-menu-item.is-active { background: rgba(255,255,255,0.12) !important; color: #ffffff !important; font-weight: 600; }
-.el-menu--popup-container .el-menu .el-menu-item:focus { background: rgba(255,255,255,0.08) !important; }
 </style>

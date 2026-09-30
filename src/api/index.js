@@ -123,3 +123,29 @@ export const uploadTaskListApi = {
   // 清空全部已完成 → 删除条数
   clearCompleted: () => request.post('/uploads/clear-completed')
 }
+
+
+// ===== App 版本发布管理（admin）=====
+export const appReleaseApi = {
+  // 发布列表：{ platform?, status?, page, size } → { records, total }
+  list: params => request.get('/admin/app/releases', { params }),
+  // 上传并创建发布（multipart）：file + platform + versionName + updateNotes + forceUpdate + rolloutPercent + publishNow
+  create: (formData, onProgress) => request.post('/admin/app/releases', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 10 * 60 * 1000,
+    onUploadProgress: onProgress ? (e) => onProgress(Math.round((e.loaded / e.total) * 100)) : undefined
+  }),
+  // 修改发布：{ rolloutPercent?, forceUpdate?, updateNotes? }
+  update: (id, data) => request.patch(`/admin/app/releases/${id}`, data),
+  // 发布（draft/disabled → published）
+  publish: id => request.post(`/admin/app/releases/${id}/publish`),
+  // 停用（published → disabled）
+  disable: id => request.post(`/admin/app/releases/${id}/disable`),
+  // 删除草稿
+  remove: id => request.delete(`/admin/app/releases/${id}`)
+}
+
+// ===== 桌面端检查更新（客户端）=====
+// platform=windows；versionCode 由 package.json 版本换算
+export const checkAppUpdate = (platform, versionCode) =>
+  request.get('/app/check-update', { params: { platform, versionCode } })
