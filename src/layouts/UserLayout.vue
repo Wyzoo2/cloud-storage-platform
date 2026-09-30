@@ -45,6 +45,7 @@
           </el-icon>
         </div>
         <div class="header-right">
+          <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
           <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
             <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
           </button>
@@ -89,6 +90,9 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const billingStore = useBillingStore()
 
+// 桌面端（Electron）才显示检查更新按钮；点击触发 App.vue 的手动检查
+const isDesktop = !!window.desktop?.isDesktop
+const checkForUpdate = () => document.dispatchEvent(new CustomEvent('app:check-update'))
 const isMobile = ref(false)
 const mobileMenuOpen = ref(false)
 
