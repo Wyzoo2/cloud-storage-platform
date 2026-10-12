@@ -72,8 +72,11 @@ async function handleLogin() {
   if (!valid) return
   loading.value = true
   try {
-    // 后端真实登录：POST /auth/login → { accessToken, refreshToken, user }
-    const res = await authApi.login({ username: form.value.username.trim(), password: form.value.password })
+    const payload = { username: form.value.username.trim(), password: form.value.password }
+    // 用户端：POST /auth/login（门户账号校验）
+    // 管理端：POST /admin/login（后端只校验本地管理员密码，管理员密码不出本机）
+    // 两者请求体与成功响应体（{ accessToken, refreshToken, user }）完全一致
+    const res = portal.value === 'admin' ? await authApi.adminLogin(payload) : await authApi.login(payload)
     userStore.login(res)
     if (res.user?.mustChangePassword) ElMessage.warning('当前密码为初始密码，请尽快在个人中心修改')
     if (portal.value === 'admin' && userStore.role !== 'admin') {

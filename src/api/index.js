@@ -2,7 +2,10 @@ import request from './request'
 
 // ===== 认证 =====
 export const authApi = {
+  // 用户端登录：门户账号校验（POST /auth/login → { accessToken, refreshToken, user }）
   login: data => request.post('/auth/login', data),
+  // 管理端登录：请求体 / 响应体与 login 完全一致，但后端只校验本地管理员密码，不调用门户账号服务
+  adminLogin: data => request.post('/admin/login', data),
   logout: () => request.post('/auth/logout'),
   changePassword: data => request.post('/auth/change-password', data),
   profile: () => request.get('/auth/profile'),
