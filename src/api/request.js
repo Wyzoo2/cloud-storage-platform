@@ -24,6 +24,9 @@ request.interceptors.response.use(
       redirectToLogin()
       return Promise.reject(new Error(message || '登录已过期'))
     }
+    // 其余非 0 code 一律走通用失败分支，直接展示后端 message，不按 code 猜测语义。
+    // 例：code=50000「系统繁忙，请稍后重试」= 门户账号服务暂时不可用（不是密码错，也不是 40101），
+    // 因此绝不能在此处把它映射成"用户名或密码错误"。
     ElMessage.error(message || '请求失败')
     return Promise.reject(new Error(message || '请求失败'))
   },
