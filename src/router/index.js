@@ -25,7 +25,10 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/login' }
 ]
 
-const router = createRouter({ history: createWebHistory(), routes })
+// base 与 vite 的 base 一致；桌面端保持原来的根 base
+const ROUTER_BASE = import.meta.env.MODE === 'desktop' ? '/' : import.meta.env.BASE_URL
+
+const router = createRouter({ history: createWebHistory(ROUTER_BASE), routes })
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('cs-token')

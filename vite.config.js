@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
+import { MOUNT_BASE } from './src/deploy.config.js'
 
 export default defineConfig(({ mode }) => ({
-  // 桌面端打包（--mode desktop）资源用相对路径，Electron 以 file:// 加载 dist；Web 端保持根路径
-  base: mode === 'desktop' ? './' : '/',
+  // 桌面端（--mode desktop）用相对路径（Electron file://）；Web 端前缀见 src/deploy.config.js
+  base: mode === 'desktop' ? './' : MOUNT_BASE,
   plugins: [vue()],
   resolve: {
     alias: {
@@ -22,7 +23,7 @@ export default defineConfig(({ mode }) => ({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://192.168.9.121:3001',
+        target: 'http://192.168.9.105:3001',
         // target: 'http://112.4.135.254:9999',
         changeOrigin: true
       }
