@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({

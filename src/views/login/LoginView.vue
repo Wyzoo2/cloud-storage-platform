@@ -52,6 +52,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { usePermissionStore } from '@/stores/permission'
+import { landingPath } from '@/utils/landing'
 import { useAppStore } from '@/stores/app'
 import { authApi } from '@/api'
 
@@ -79,13 +81,14 @@ async function handleLogin() {
     const res = portal.value === 'admin' ? await authApi.adminLogin(payload) : await authApi.login(payload)
     userStore.login(res)
     if (res.user?.mustChangePassword) ElMessage.warning('当前密码为初始密码，请尽快在个人中心修改')
-    if (portal.value === 'admin' && userStore.role !== 'admin') {
-      ElMessage.warning('该账号无管理员权限，已进入用户端')
-      router.push('/files')
-      return
-    }
+    // 先拿权限上下文，再决定去管理端还是用户端    
+    const perm = usePermissionStore()
+    await perm.load(true)
+    const wantsAdmin = portal.value === 'admin'
+    const canAdmin = perm.isPlatform || perm.isEnterpriseAdmin
+    if (wantsAdmin && !canAdmin) ElMessage.warning('该账号无管理端权限，已进入用户端')
     ElMessage.success('登录成功')
-    router.push(portal.value === 'admin' ? '/admin/dashboard' : '/files')
+    router.push(landingPath(perm, { prefer: wantsAdmin && canAdmin ? 'admin' : 'user' }))
   } catch (e) {
     // 错误提示由请求拦截器统一弹出（如"用户名或密码错误"）
   } finally {

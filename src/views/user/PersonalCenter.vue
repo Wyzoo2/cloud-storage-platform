@@ -1,8 +1,22 @@
 <template>
   <div class="cs-page">
     <h2 class="page-title"><el-icon><User /></el-icon>个人中心</h2>
+    <el-alert
+      v-if="perm.perms.length === 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="no-perm-alert"
+      title="该账号尚未分配任何角色与权限，功能入口为空；请联系管理员分配角色后重新登录"
+    />    <!-- 账号归属 -->
+    <div class="cs-card account-card">
+      <div class="account-row"><span class="account-label">所属企业</span><span>{{ perm.enterpriseName || '平台' }}</span></div>
+      <div class="account-row"><span class="account-label">账号身份</span><span>{{ perm.identityLabel }}</span></div>
+      <div class="account-row"><span class="account-label">我的角色</span><span>{{ perm.roles?.[0]?.name || '未分配' }}</span></div>
+      <div class="account-row"><span class="account-label">数据范围</span><span>{{ scopeLabel(perm.dataScope) }}</span></div>
+    </div>
     <div class="profile-grid">
-      <div class="cs-card quota-card">
+      <div class="cs-card quota-card" v-perm="'quota.read'">
         <div class="quota-header">
           <h3>存储空间</h3>
           <el-tag :type="quotaPercent > 80 ? 'danger' : quotaPercent > 60 ? 'warning' : 'success'" size="small">{{ quotaPercent }}%</el-tag>
@@ -63,10 +77,13 @@
       <div class="cs-card info-card">
         <h3>账户信息</h3>
         <el-descriptions :column="1" border style="margin-top: 20px">
-          <el-descriptions-item label="用户名">{{ userStore.username }}</el-descriptions-item>
-          <el-descriptions-item label="角色"><el-tag :type="userStore.role === 'admin' ? 'danger' : ''">{{ userStore.role === 'admin' ? '管理员' : '普通用户' }}</el-tag></el-descriptions-item>
-          <el-descriptions-item label="用户ID">{{ userStore.userId || '--' }}</el-descriptions-item>
-          <el-descriptions-item label="上次登录">--</el-descriptions-item>
+          <el-descriptions-item label="显示名称">{{ userStore.displayName || perm.nickname }}</el-descriptions-item>
+          <el-descriptions-item v-if="accountOf(userStore)" label="登录账号">{{ userStore.username }}</el-descriptions-item>
+          <el-descriptions-item label="账号身份">
+            <el-tag :type="identityType" effect="plain">{{ perm.identityLabel }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="我的角色">{{ perm.roles?.[0]?.name || '未分配' }}</el-descriptions-item>
+          <el-descriptions-item label="用户 ID">{{ userStore.userId || '--' }}</el-descriptions-item>
         </el-descriptions>
       </div>
     </div>
@@ -78,11 +95,17 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useBillingStore } from '@/stores/billing'
+import { usePermissionStore } from '@/stores/permission'
 import { statsApi, authApi } from '@/api'
 import { formatSize, formatDate } from '@/utils/file'
+import { scopeLabel } from '@/constants/menus'
+import { accountOf } from '@/utils/user'
 
 const userStore = useUserStore()
 const billing = useBillingStore()
+const perm = usePermissionStore()
+// el-tag 的 type 只接受固定枚举值，不能传空字符串
+const identityType = computed(() => (perm.isPlatform ? 'danger' : perm.isEnterpriseAdmin ? 'warning' : 'info'))
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const changing = ref(false)
 const stats = ref({ totalFiles: 0, totalDirs: 0, recycleCount: 0 })
@@ -129,6 +152,10 @@ async function handleChangePassword() {
 </script>
 
 <style scoped>
+.account-card { display: flex; gap: 28px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 14px; }
+.account-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--cs-text-primary); }
+.account-label { font-size: 12px; color: var(--cs-text-tertiary); }
+.no-perm-alert { margin-bottom: 14px; border-radius: var(--cs-radius); }
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }
 .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 .quota-card { grid-column: 1 / -1; padding: 24px; }

@@ -7,19 +7,21 @@
         <el-tag v-show="!isCollapsed" size="small" type="danger" effect="dark">管理端</el-tag>
       </div>
       <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
-        <el-menu-item index="/admin/dashboard"><el-icon><DataAnalysis /></el-icon><template #title>统计大盘</template></el-menu-item>
-        <el-menu-item index="/admin/users"><el-icon><UserFilled /></el-icon><template #title>用户管理</template></el-menu-item>
-        <el-menu-item index="/admin/logs"><el-icon><Document /></el-icon><template #title>审计日志</template></el-menu-item>
-        <el-sub-menu index="billing">
-          <template #title><el-icon><Wallet /></el-icon><span>计费管理</span></template>
-          <el-menu-item index="/admin/billing/config">计费配置</el-menu-item>
-          <el-menu-item index="/admin/billing/approval">增额审批</el-menu-item>
-          <el-menu-item index="/admin/billing/records">缴费台账</el-menu-item>
-        </el-sub-menu>
-        <el-menu-item index="/admin/app-release"><el-icon><Upload /></el-icon><template #title>版本发布</template></el-menu-item>
+        <template v-for="m in visibleMenus" :key="m.path">
+          <el-sub-menu v-if="m.children" :index="m.path">
+            <template #title>
+              <el-icon><component :is="m.icon" /></el-icon><span>{{ m.title }}</span>
+            </template>
+            <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ c.title }}</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item v-else :index="m.path">
+            <el-icon><component :is="m.icon" /></el-icon>
+            <template #title>{{ m.title }}</template>
+          </el-menu-item>
+        </template>
       </el-menu>
       <div class="sidebar-bottom">
-        <el-button text @click="router.push('/')" class="back-btn"><el-icon><Back /></el-icon><span v-show="!isCollapsed">返回用户端</span></el-button>
+        <el-button v-if="hasUserPortal" text @click="router.push('/')" class="back-btn"><el-icon><Back /></el-icon><span v-show="!isCollapsed">返回用户端</span></el-button>
       </div>
     </aside>
     <div v-if="isMobile && mobileMenuOpen" class="mobile-mask" @click="closeMobileMenu"></div>
@@ -38,6 +40,15 @@
           </el-icon>
         </div>
         <div class="header-right">
+          <el-tooltip
+            v-if="perm.legacy"
+            content="权限服务暂不可用，菜单按默认权限展示"
+            placement="bottom"
+          >
+            <el-tag size="small" type="warning" effect="plain" class="legacy-chip">兼容模式</el-tag>
+          </el-tooltip>
+          <el-tag v-if="perm.enterpriseName" size="small" effect="plain" class="enterprise-chip">{{ perm.enterpriseName }}</el-tag>
+          <el-tag v-if="currentRoleName" size="small" effect="plain" class="role-chip">{{ currentRoleName }}</el-tag>
           <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
           <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
             <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
@@ -45,7 +56,7 @@
           <el-dropdown trigger="click">
             <span class="user-info">
               <el-avatar :size="32" class="user-avatar admin-avatar"><el-icon :size="18"><User /></el-icon></el-avatar>
-              <span class="user-name">{{ userStore.username }}</span>
+              <span class="user-name">{{ userStore.displayName || perm.nickname }}</span>
               <el-icon :size="12"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -71,12 +82,26 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { usePermissionStore } from '@/stores/permission'
+import { ADMIN_MENUS, USER_MENUS, filterMenus } from '@/constants/menus'
 import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const perm = usePermissionStore()
+
+// 菜单显隐 = 权限点 × 身份（系统管理员 / 企业管理员）；legacy 时隐藏依赖新接口的菜单
+// 当前账号角色名（/me/context.roles）
+const currentRoleName = computed(() => perm.identityLabel || '')
+const visibleMenus = computed(() =>
+  filterMenus(ADMIN_MENUS, perm.can, { identity: perm.identity })
+)
+
+// 是否还有用户端可用入口（企业管理员可能只有管理端菜单，此时不显示「返回用户端」）
+const hasUserPortal = computed(() => filterMenus(USER_MENUS, perm.can, { identity: perm.identity }).length > 0)
+
 
 // 桌面端（Electron）才显示检查更新按钮；点击触发 App.vue 的手动检查
 const isDesktop = !!window.desktop?.isDesktop
@@ -156,6 +181,8 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 .collapse-btn { cursor: pointer; color: var(--cs-text-secondary); transition: color var(--cs-transition); }
 .collapse-btn:hover { color: var(--cs-primary); }
 .header-right { display: flex; align-items: center; gap: 12px; }
+.legacy-chip { font-weight: 500; cursor: help; }
+.role-chip { color: var(--cs-primary); }
 .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 8px; border-radius: var(--cs-radius-sm); transition: background var(--cs-transition); }
 .user-info:hover { background: var(--cs-bg-hover); }
 .user-avatar { background: var(--cs-primary-lighter); color: var(--cs-primary); }

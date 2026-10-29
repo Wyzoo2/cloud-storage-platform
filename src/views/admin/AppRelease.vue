@@ -2,7 +2,7 @@
   <div class="cs-page">
     <div class="breadcrumb-bar">
       <h2 class="page-title"><el-icon><Upload /></el-icon>版本发布管理</h2>
-      <el-button type="primary" @click="openCreateDialog"><el-icon><Plus /></el-icon>发布新版本</el-button>
+      <el-button v-perm="'admin.release.manage'" type="primary" @click="openCreateDialog"><el-icon><Plus /></el-icon>发布新版本</el-button>
     </div>
     <div class="toolbar">
       <div class="toolbar-left">
@@ -63,20 +63,20 @@
           <template #default="{ row }">
             <div class="op-actions">
               <template v-if="row.status === 'published'">
-                <el-button link type="primary" size="small" @click="openRolloutDialog(row)"><el-icon><SetUp /></el-icon>调整灰度</el-button>
-                <el-button link type="warning" size="small" @click="handleToggleForce(row)">
+                <el-button v-perm="'admin.release.manage'" link type="primary" size="small" @click="openRolloutDialog(row)"><el-icon><SetUp /></el-icon>调整灰度</el-button>
+                <el-button v-perm="'admin.release.manage'" link type="warning" size="small" @click="handleToggleForce(row)">
                   <el-icon><component :is="row.forceUpdate ? 'Unlock' : 'Lock'" /></el-icon>
                   {{ row.forceUpdate ? '取消强制' : '设为强制' }}
                 </el-button>
-                <el-button link type="danger" size="small" @click="handleDisable(row)"><el-icon><CircleClose /></el-icon>停用</el-button>
+                <el-button v-perm="'admin.release.manage'" link type="danger" size="small" @click="handleDisable(row)"><el-icon><CircleClose /></el-icon>停用</el-button>
               </template>
               <template v-if="row.status === 'draft'">
-                <el-button link type="success" size="small" @click="handlePublish(row)"><el-icon><CircleCheck /></el-icon>发布</el-button>
+                <el-button v-perm="'admin.release.manage'" link type="success" size="small" @click="handlePublish(row)"><el-icon><CircleCheck /></el-icon>发布</el-button>
               </template>
               <template v-if="row.status === 'disabled'">
-                <el-button link type="success" size="small" @click="handleEnable(row)"><el-icon><CircleCheck /></el-icon>启用</el-button>
+                <el-button v-perm="'admin.release.manage'" link type="success" size="small" @click="handleEnable(row)"><el-icon><CircleCheck /></el-icon>启用</el-button>
               </template>
-              <el-button v-if="row.status === 'draft'" link type="danger" size="small" @click="handleDelete(row)"><el-icon><Delete /></el-icon>删除</el-button>
+              <el-button v-if="row.status === 'draft'" v-perm="'admin.release.manage'" link type="danger" size="small" @click="handleDelete(row)"><el-icon><Delete /></el-icon>删除</el-button>
               <el-button link type="info" size="small" @click="handleCopyLink(row)"><el-icon><CopyDocument /></el-icon>复制链接</el-button>
             </div>
           </template>

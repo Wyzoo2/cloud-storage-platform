@@ -13,59 +13,109 @@ request.interceptors.request.use(config => {
   return config
 })
 
+const CLEAR_KEYS = ['cs-token', 'cs-refresh-token', 'cs-user-id', 'cs-username', 'cs-role', 'cs-quota', 'cs-must-change-pwd', 'cs-perm-ctx']
+
 let refreshing = false
+
+/**
+ * 错误码矩阵（接口文档 v1.1 §5.1）
+ *   40001 未登录/令牌无效 → 直接去登录
+ *   40103 登录态已不可用（过期 / 成员停用 / 企业停用）→ 先刷新，失败再去登录
+ *   40301 已登录但缺权限点 → 提示 + 刷新一次权限上下文（权限是实时生效的）
+ *   其余（409xx / 42101 / 50000 …）→ 原样展示后端 message，不按 code 猜语义
+ */
+function fail(message, silent) {
+  const msg = message || '请求失败'
+  if (!silent) ElMessage.error(msg)
+  return Promise.reject(new Error(msg))
+}
+
+/** 刷新权限上下文：动态引入避免 store ↔ api 循环依赖 */
+function refreshPermissions() {
+  import('@/stores/permission')
+    .then(m => m.usePermissionStore().load(true))
+    .catch(() => {})
+}
+
+function redirectToLogin(tip = '登录已过期，请重新登录') {
+  CLEAR_KEYS.forEach(k => localStorage.removeItem(k))
+  if (router.currentRoute.value.path === '/login') return
+  ElMessage.warning(tip)
+  router.push('/login')
+}
+
+/** 用 refreshToken 换新令牌后重放；失败即去登录（40103 的死循环防护见下） */
+function refreshAndReplay(config) {
+  const refreshToken = localStorage.getItem('cs-refresh-token')
+  if (!refreshToken || refreshing || config?._retried) {
+    redirectToLogin()
+    return Promise.reject(new Error('登录已过期，请重新登录'))
+  }
+  refreshing = true
+  return axios.post(`${baseURL}/auth/refresh`, { refreshToken })
+    .then(res => {
+      const body = res.data || {}
+      // 刷新接口自己也可能返回 40103（成员/企业被停用）→ 直接去登录，绝不再重试
+      if (body.code !== 0 || !body.data?.accessToken) throw new Error(body.message || 'refresh failed')
+      localStorage.setItem('cs-token', body.data.accessToken)
+      if (body.data.refreshToken) localStorage.setItem('cs-refresh-token', body.data.refreshToken)
+      config._retried = true
+      return request(config)
+    })
+    .catch(() => {
+      redirectToLogin('账号或所属企业已停用，请联系管理员')
+      throw new Error('登录已过期，请重新登录')
+    })
+    .finally(() => { refreshing = false })
+}
 
 // 响应拦截：统一处理 Result{code, message, data}，code=0 成功
 request.interceptors.response.use(
   response => {
-    const { code, message } = response.data
-    if (code === 0) return response.data.data
-    if (code === 40103) {
-      redirectToLogin()
-      return Promise.reject(new Error(message || '登录已过期'))
+
+    const body = response.data || {}
+    const { code, message } = body
+    const silent = !!response.config?.silent
+    if (code === 0) return body.data
+
+    if (code === 40103) return refreshAndReplay(response.config)
+    if (code === 40001) {
+      redirectToLogin(message || '请先登录')
+      return Promise.reject(new Error(message || '请先登录'))
     }
-    // 其余非 0 code 一律走通用失败分支，直接展示后端 message，不按 code 猜测语义。
-    // 例：code=50000「系统繁忙，请稍后重试」= 门户账号服务暂时不可用（不是密码错，也不是 40101），
-    // 因此绝不能在此处把它映射成"用户名或密码错误"。
-    ElMessage.error(message || '请求失败')
-    return Promise.reject(new Error(message || '请求失败'))
+    if (code === 40301) {
+      refreshPermissions()
+      return fail(message || '无权限访问', silent)
+    }
+    // 40400：后端明确"接口不存在"（通常是新功能还没上线），给一句能看懂的话
+    if (code === 40400) {
+      const url = response.config?.url || ''
+      return fail(`接口未上线：${url.startsWith('/') ? url : '/' + url}`, silent)
+    }
+    return fail(message, silent)
   },
   error => {
     // 用户主动取消（暂停/放弃上传）：静默返回，不弹错误提示
     if (axios.isCancel(error) || error.code === 'ERR_CANCELED' || error.name === 'AbortError') return Promise.reject(error)
-    if (error.response?.status === 401) {
-      const refreshToken = localStorage.getItem('cs-refresh-token')
-      if (refreshToken && !refreshing && !error.config?._retried) {
-        refreshing = true
-        return axios.post(`${baseURL}/auth/refresh`, { refreshToken }).then(res => {
-          const d = res.data?.data || {}
-          if (!d.accessToken) throw new Error('refresh failed')
-          localStorage.setItem('cs-token', d.accessToken)
-          if (d.refreshToken) localStorage.setItem('cs-refresh-token', d.refreshToken)
-          error.config._retried = true
-          return request(error.config)
-        }).catch(() => {
-          redirectToLogin()
-          return Promise.reject(error)
-        }).finally(() => { refreshing = false })
-      }
-      redirectToLogin()
+
+    const status = error.response?.status
+    const bodyCode = error.response?.data?.code
+    const silent = !!error.config?.silent
+
+    if (bodyCode === 40001) {
+      redirectToLogin(error.response?.data?.message || '请先登录')
       return Promise.reject(error)
     }
-    ElMessage.error(error.response?.data?.message || '网络异常')
+    if (bodyCode === 40400) {
+      const url = error.config?.url || ''
+      return fail(`接口未上线：${url.startsWith('/') ? url : '/' + url}`, silent)
+    }
+    // 401 或 40103：都按"登录态不可用"处理（刷新一次，失败去登录）
+    if (bodyCode === 40103 || status === 401) return refreshAndReplay(error.config)
+
+    if (!silent) ElMessage.error(error.response?.data?.message || '网络异常')
     return Promise.reject(error)
   }
 )
-
-function redirectToLogin() {
-  if (router.currentRoute.value.path === '/login') return
-  localStorage.removeItem('cs-token')
-  localStorage.removeItem('cs-refresh-token')
-  localStorage.removeItem('cs-user-id')
-  localStorage.removeItem('cs-username')
-  localStorage.removeItem('cs-role')
-  ElMessage.warning('登录已过期，请重新登录')
-  router.push('/login')
-}
 
 export default request

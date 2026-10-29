@@ -3,7 +3,21 @@
     <h2 class="page-title"><el-icon><Document /></el-icon>审计日志</h2>
     <div class="toolbar cs-card" style="padding: 16px 20px; margin-bottom: 20px;">
       <div class="filter-row">
-        <el-input v-model="filters.username" placeholder="操作人名称" clearable style="width: 160px" :prefix-icon="User" />
+        <el-select
+          v-model="filters.userId"
+          placeholder="操作人（输入用户名搜索）"
+          clearable
+          filterable
+          remote
+          :remote-method="searchUsers"
+          :loading="userLoading"
+          style="width: 200px"
+        >
+          <el-option v-for="u in userOptions" :key="u.id" :label="u.nickname || u.username" :value="u.id">
+            <span>{{ u.nickname || u.username }}</span>
+            <span class="opt-sub">{{ u.username }}</span>
+          </el-option>
+        </el-select>
         <el-select v-model="filters.action" placeholder="动作类型" clearable style="width: 160px">
           <el-option-group label="用户操作">
             <el-option label="登录" value="login" /><el-option label="登出" value="logout" /><el-option label="上传" value="upload" />
@@ -32,7 +46,7 @@
               <h4>详细信息</h4>
               <el-descriptions :column="2" border size="small">
                 <el-descriptions-item label="日志ID">{{ row.id }}</el-descriptions-item>
-                <el-descriptions-item label="操作人">{{ userMap[row.userId] ? userMap[row.userId] + '（ID ' + row.userId + '）' : 'ID ' + row.userId }}</el-descriptions-item>
+                <el-descriptions-item label="操作人">{{ row.username || ('ID ' + row.userId) }}</el-descriptions-item>
                 <el-descriptions-item label="动作">{{ actionLabel(row.action) }}</el-descriptions-item>
                 <el-descriptions-item label="目标">{{ targetLabel(row) }}</el-descriptions-item>
                 <el-descriptions-item label="IP地址">{{ row.ip || '--' }}</el-descriptions-item>
@@ -46,7 +60,7 @@
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
         <el-table-column prop="userId" label="操作人" width="120">
-          <template #default="{ row }"><span class="user-cell">{{ userMap[row.userId] || ('用户 ' + row.userId) }}</span></template>
+          <template #default="{ row }"><span class="user-cell">{{ row.username || ('ID ' + row.userId) }}</span></template>
         </el-table-column>
         <el-table-column prop="action" label="动作" width="140">
           <template #default="{ row }"><el-tag size="small" :type="actionTagType(row.action)">{{ actionLabel(row.action) }}</el-tag></template>
@@ -66,9 +80,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Search, User } from '@element-plus/icons-vue'
-import { auditApi, adminApi } from '@/api'
+import { onMounted, ref } from 'vue'
+import { Document, Refresh, Search } from '@element-plus/icons-vue'
+import { adminApi, auditApi } from '@/api'
 import { formatDate } from '@/utils/file'
 
 const logs = ref([])
@@ -76,40 +90,43 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const loading = ref(false)
-const filters = ref({ username: '', action: '', dateRange: null })
-// 用户ID → 用户名映射（审计日志只带 userId，用用户列表补全显示）
-const userMap = ref({})
-// 用户名 → ID 反向映射（筛选用）
-const nameToIdMap = ref({})
+const filters = ref({ userId: null, action: '', dateRange: null })
 
-onMounted(() => {
-  loadLogs()
-  adminApi.listUsers({ page: 1, size: 100 }).then(res => {
-    const m = {}, rev = {}
-    ;(res.content || []).forEach(u => { m[u.id] = u.username; rev[u.username] = u.id })
-    userMap.value = m
-    nameToIdMap.value = rev
-  }).catch(() => {})
-})
+/* 操作人候选：输入即查后端（/admin/users?keyword=），选中后按 userId 过滤 */
+
+const userOptions = ref([])
+const userLoading = ref(false)
+async function searchUsers(kw) {
+  if (!kw) { userOptions.value = []; return }
+  userLoading.value = true
+  try {
+    const res = await adminApi.listUsers({ keyword: kw, page: 1, size: 20 })
+    userOptions.value = (res?.content || res?.list || []).map(u => ({ id: u.id, username: u.username, nickname: u.nickname }))
+  } catch (e) {
+    userOptions.value = []
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function buildParams() {
+  const p = { page: currentPage.value, size: pageSize.value }
+  if (filters.value.userId) p.userId = filters.value.userId
+  if (filters.value.action) p.action = filters.value.action
+  if (filters.value.dateRange && filters.value.dateRange.length === 2) {
+    const [s, e] = filters.value.dateRange
+    const start = new Date(s); start.setHours(0, 0, 0, 0)
+    const end = new Date(e); end.setHours(23, 59, 59, 999)
+    p.start = start.toISOString()
+    p.end = end.toISOString()
+  }
+  return p
+}
 
 async function loadLogs() {
   loading.value = true
   try {
-    const params = { page: currentPage.value, size: pageSize.value }
-    if (filters.value.username) {
-      const uid = nameToIdMap.value[filters.value.username]
-      if (uid) params.userId = uid
-      else { params.userId = -1 } // 用户不存在，让后端返回空结果
-    }
-    if (filters.value.action) params.action = filters.value.action
-    if (filters.value.dateRange && filters.value.dateRange.length === 2) {
-      const [s, e] = filters.value.dateRange
-      const start = new Date(s); start.setHours(0, 0, 0, 0)
-      const end = new Date(e); end.setHours(23, 59, 59, 999)
-      params.start = start.toISOString()
-      params.end = end.toISOString()
-    }
-    const res = await auditApi.query(params)
+    const res = await auditApi.query(buildParams())
     logs.value = res.list || []
     total.value = res.total || 0
   } finally {
@@ -119,22 +136,29 @@ async function loadLogs() {
 
 function handleSearch() { currentPage.value = 1; loadLogs() }
 function handleSizeChange() { currentPage.value = 1; loadLogs() }
-function handleReset() { filters.value = { username: '', action: '', dateRange: null }; currentPage.value = 1; loadLogs() }
+function handleReset() { filters.value = { userId: null, action: '', dateRange: null }; currentPage.value = 1; loadLogs() }
 
 // 后端实际动作值为小写（login / mkdir / user_manage 等），未收录的显示原文
 const actionMap = { login: '登录', logout: '登出', upload: '上传', download: '下载', delete: '删除', restore: '恢复', mkdir: '新建文件夹', create_folder: '新建文件夹', rename: '重命名', move: '移动', share: '分享', user_manage: '用户管理', billing_request: '增额申请', billing_approve: '审批通过', billing_reject: '审批驳回', billing_expire: '增量到期收回', billing_config: '计费配置变更', user_demote: '用户降级', quota_change: '配额变更', delete_force: '强制删除' }
 function actionLabel(a) { return actionMap[String(a || '').toLowerCase()] || a }
 function actionTagType(a) { const k = String(a || '').toLowerCase(); if (!k) return 'info'; if (k === 'user_manage' || k === 'billing_config' || k === 'quota_change') return 'warning'; if (['delete', 'logout', 'billing_expire'].includes(k)) return 'info'; if (k === 'login' || k === 'billing_approve') return 'success'; if (k === 'billing_reject' || k === 'user_demote' || k === 'delete_force') return 'danger'; return 'info' }
 // detail 是 JSON 字符串，格式化后展示；target 优先取 detail 里的 name（如目录名）
+function parseDetail(row) {
+  if (!row?.detail) return null
+  try { return typeof row.detail === 'string' ? JSON.parse(row.detail) : row.detail } catch { return null }
+}
 function detailText(row) {
-  if (!row.detail) return '--'
-  try { return JSON.stringify(JSON.parse(row.detail), null, 2) } catch { return row.detail }
+  const d = parseDetail(row)
+  return d ? JSON.stringify(d, null, 2) : (row.detail || '--')
 }
 function targetLabel(row) {
-  if (row.target == null || row.target === '') return '--'
-  try { const o = JSON.parse(row.detail); if (o && o.name) return o.name } catch {}
-  return row.target
+  const d = parseDetail(row)
+  return d?.name || row.target || '--'
 }
+
+onMounted(() => {
+  loadLogs()
+})
 </script>
 
 <style scoped>

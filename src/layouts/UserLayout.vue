@@ -6,11 +6,10 @@
         <span v-show="!isCollapsed" class="sidebar-title">CloudVault</span>
       </div>
       <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
-        <el-menu-item index="/files"><el-icon><FolderOpened /></el-icon><template #title>我的文件</template></el-menu-item>
-        <el-menu-item index="/transfers"><el-icon><Upload /></el-icon><template #title>传输任务</template></el-menu-item>
-        <el-menu-item index="/recycle"><el-icon><Delete /></el-icon><template #title>回收站</template></el-menu-item>
-        <el-menu-item index="/billing"><el-icon><Wallet /></el-icon><template #title>增额申请</template></el-menu-item>
-        <el-menu-item index="/profile"><el-icon><User /></el-icon><template #title>个人中心</template></el-menu-item>
+        <el-menu-item v-for="m in visibleMenus" :key="m.path" :index="m.path">
+          <el-icon><component :is="m.icon" /></el-icon>
+          <template #title>{{ m.title }}</template>
+        </el-menu-item>
       </el-menu>
       <div class="sidebar-bottom">
         <div class="quota-info" v-show="!isCollapsed">
@@ -52,7 +51,7 @@
           <el-dropdown trigger="click">
             <span class="user-info">
               <el-avatar :size="32" class="user-avatar"><el-icon :size="18"><User /></el-icon></el-avatar>
-              <span class="user-name">{{ userStore.username }}</span>
+              <span class="user-name">{{ userStore.displayName || perm.nickname }}</span>
               <el-icon :size="12"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -81,6 +80,8 @@ import { ElNotification } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useBillingStore } from '@/stores/billing'
+import { usePermissionStore } from '@/stores/permission'
+import { USER_MENUS, filterMenus } from '@/constants/menus'
 import { fetchUploadTasks } from '@/utils/uploadTaskStore'
 import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
@@ -89,6 +90,10 @@ const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const billingStore = useBillingStore()
+const perm = usePermissionStore()
+
+// 菜单显隐按权限点；legacy 降级时隐藏依赖新接口的菜单（如「成员文件」）
+const visibleMenus = computed(() => filterMenus(USER_MENUS, perm.can, { legacy: perm.legacy, identity: perm.identity }))
 
 // 桌面端（Electron）才显示检查更新按钮；点击触发 App.vue 的手动检查
 const isDesktop = !!window.desktop?.isDesktop

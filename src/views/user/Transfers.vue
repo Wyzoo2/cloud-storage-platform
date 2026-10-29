@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <div class="task-row__ops">
+        <div class="task-row__ops" v-perm="'transfer.control'">
           <el-tooltip v-if="stateOf(t) === 'uploading'" content="暂停" placement="top">
             <button class="op-btn" @click="transfer.pauseTask(t)"><el-icon><VideoPause /></el-icon></button>
           </el-tooltip>

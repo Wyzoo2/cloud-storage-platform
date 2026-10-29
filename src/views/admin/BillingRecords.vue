@@ -11,7 +11,9 @@
           <el-radio-button value="expired">已过期</el-radio-button>
         </el-radio-group>
       </div>
-      <div class="toolbar-right"><el-tag>共 {{ total }} 条记录</el-tag></div>
+      <div class="toolbar-right">
+        <el-tag>共 {{ total }} 条记录</el-tag>
+      </div>
     </div>
     <div class="cs-card table-card">
       <el-table :data="list" v-loading="loading" style="width:100%;min-width:820px">
@@ -66,6 +68,8 @@ const total = ref(0)
 
 const statusTagType = (s) => ({ active: 'success', expired: 'info' })[s] || 'info'
 const statusLabel = (s) => ({ active: '生效中', expired: '已过期' })[s] || s
+
+// 导出台账：沿用当前状态筛选，由后端生成文件（导出动作本身会记审计）
 
 const formatDateTime = (ts) => {
   if (!ts) return '-'

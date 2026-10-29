@@ -36,7 +36,7 @@
         </el-form-item>
 
         <el-form-item>
-          <el-button type="primary" :loading="saving" @click="handleSave"><el-icon><Check /></el-icon>保存配置</el-button>
+          <el-button v-perm="'admin.billing.manage'" type="primary" :loading="saving" @click="handleSave"><el-icon><Check /></el-icon>保存配置</el-button>
           <el-button :disabled="saving" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>

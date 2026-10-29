@@ -1,6 +1,11 @@
 <template>
   <div class="cs-page">
-    <h2 class="page-title"><el-icon><DataAnalysis /></el-icon>统计大盘</h2>
+    <div class="breadcrumb-bar">
+      <div class="title-row">
+        <h2 class="page-title"><el-icon><DataAnalysis /></el-icon>统计大盘</h2>
+        <el-tag v-if="perm.identity === 'enterprise'" size="small" effect="plain" class="scope-tag">本企业数据</el-tag>
+      </div>
+    </div>
     <div class="stats-row">
       <div v-for="stat in statCards" :key="stat.label" class="stat-card" :class="stat.gradient">
         <div class="stat-card-content">
@@ -34,9 +39,11 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useAppStore } from '@/stores/app'
 import { adminApi } from '@/api'
+import { usePermissionStore } from '@/stores/permission'
 import { formatSize } from '@/utils/file'
 
 const appStore = useAppStore()
+const perm = usePermissionStore()
 const topUsersChart = ref(null)
 const trafficChart = ref(null)
 let topChartInstance = null, trafficChartInstance = null
@@ -58,7 +65,8 @@ function getTextColor() { return appStore.theme === 'dark' ? '#e6edf3' : '#1f293
 function getSubTextColor() { return appStore.theme === 'dark' ? '#8b949e' : '#6b7280' }
 function getBorderColor() { return appStore.theme === 'dark' ? '#30363d' : '#e5e7eb' }
 
-// 加载平台总览
+
+// 加载平台总览（规范路径优先，旧路径兜底——后端未上线 /admin/dashboard/* 时行为不变）
 async function loadOverview() {
   try {
     const data = await adminApi.statsOverview()
@@ -81,7 +89,7 @@ async function loadTopUsers() {
 // 加载流量曲线
 async function loadTraffic() {
   try {
-    const data = await adminApi.statsTraffic(trafficDays.value)
+    const data = await adminApi.statsTraffic({ days: trafficDays.value })
     trafficData.value = Array.isArray(data) ? data : []
   } catch (e) {
     trafficData.value = []
@@ -214,6 +222,8 @@ watch(() => appStore.theme, () => { refreshCharts() })
 </script>
 
 <style scoped>
+.title-row { display: flex; align-items: center; gap: 10px; }
+.scope-tag { margin-left: 2px; }
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }
 .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
 .stat-card { border-radius: var(--cs-radius-lg); padding: 20px; color: #fff; position: relative; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }

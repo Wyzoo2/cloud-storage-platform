@@ -14,6 +14,13 @@ export const authApi = {
   refresh: data => request.post('/auth/refresh', data)
 }
 
+// ===== 权限上下文（RBAC，接口文档 v1.1 §4.1）=====
+export const meApi = {
+  // 一次拿全：身份 + perms[] + dataScope + isPlatform + 企业/部门
+  // silent：后端未上线该接口时不弹错（permission store 会自动降级为「全部放行」）
+  context: () => request.get('/me/context', { silent: true })
+}
+
 // ===== 文件管理 =====
 export const fileApi = {
   // 列目录：{ parent, page, size, sort } → { total, list, breadcrumb }
@@ -28,8 +35,6 @@ export const fileApi = {
   trash: params => request.get('/files/trash', { params }),
   // 从回收站还原：可选目标目录 targetParentId（0=根目录「全部文件」，缺省=原位置）
   restore: (id, data) => request.post(`/files/${id}/restore`, data || {}),
-  // 下载文件 → Map<string,string>
-  download: id => request.get(`/files/${id}/download`),
   // 获取完整目录树（扁平 id+parentId 列表，前端自行建树）
   tree: () => request.get('/files/tree'),
   // 批量移动：{ ids: number[], targetParentId: number } → FileNodeVO[]
@@ -51,14 +56,8 @@ export const auditApi = {
 export const adminApi = {
   // { keyword, status, page, size } → Spring Page { content, totalElements, ... }
   listUsers: params => request.get('/admin/users', { params }),
-  // { username, initialPassword, quotaBytes, role }
-  createUser: data => request.post('/admin/users', data),
   // { status, quotaBytes, role }
   updateUser: (id, data) => request.patch(`/admin/users/${id}`, data),
-  // 重置密码 → { password: 'xxx' }（新密码）
-  resetPassword: id => request.post(`/admin/users/${id}/reset-password`),
-  // 降级为普通用户（A3 保护：不可降级自己 / 至少保留一位 active 管理员）
-  demoteUser: id => request.post(`/admin/users/${id}/demote`),
   // ===== 管理端统计（R-C09）=====
   // 平台用量总览 → { totalQuotaBytes, usedBytes, remainingBytes, userCount }
   statsOverview: () => request.get('/admin/stats/overview'),
@@ -83,7 +82,6 @@ export const uploadApi = {
   abort: sessionId => request.post(`/uploads/${sessionId}/abort`),
   // 获取 5 分钟预签名下载地址 → { url }
   getDownloadUrl: fileId => request.get(`/files/${fileId}/download`),
-  getPreviewUrl: fileId => request.get(`/files/${fileId}/download`, { params: { inline: true } })
 }
 
 // ===== 计费管理（admin）=====
@@ -116,18 +114,12 @@ export const billingApi = {
 
 // ===== 传输任务列表（后端持久化任务记录）=====
 export const uploadTaskListApi = {
-  // 分页查询：{ status?: uploading/done/aborted, page?(从0起), size?(默认10,最大100) } → { list, total, page, size }
-  // list 项：{ id, name, sizeBytes, status, fileId, createdAt }，id = init 返回的 sessionId（后端自增）
+  // { status?, page?, size? } → { list, total, page, size }
   list: params => request.get('/uploads', { params }),
-  // 任务详情：含 uploadedParts（前端自算进度）、sha256/parentId/chunkSize（刷新后恢复续传用）
   detail: id => request.get(`/uploads/${id}`),
-  // 删除单条：仅 done/aborted；uploading 返回 40211「任务正在上传中，请先放弃」
   remove: id => request.delete(`/uploads/${id}`),
-  // 清空全部已完成 → 删除条数
   clearCompleted: () => request.post('/uploads/clear-completed')
 }
-
-
 // ===== App 版本发布管理（admin）=====
 export const appReleaseApi = {
   // 发布列表：{ platform?, status?, page, size } → { records, total }
@@ -149,6 +141,53 @@ export const appReleaseApi = {
 }
 
 // ===== 桌面端检查更新（客户端）=====
-// platform=windows；versionCode 由 package.json 版本换算
 export const checkAppUpdate = (platform, versionCode) =>
   request.get('/app/check-update', { params: { platform, versionCode } })
+
+// ===== 组织架构与角色（只保留后端已实现的只读接口）=====
+export const orgApi = {
+  // { status? } → { list: [{ id, parentId, name, path, status, sortNo }], total }（扁平结构，非树）
+  deptsTree: params => request.get('/org/depts/tree', { params }),
+  // 新建部门：{ name, parentId, sortNo? }
+  createDept: data => request.post('/org/depts', data),
+  // 编辑部门（parentId 传新上级即等于移动）：{ name?, parentId?, sortNo? }
+  updateDept: (id, data) => request.put(`/org/depts/${id}`, data),
+  removeDept: id => request.delete(`/org/depts/${id}`),
+
+  // [{ id, code, name, builtin, status, permissionCount }]
+  roles: () => request.get('/org/roles'),
+  // 新建角色：{ code, name }
+  createRole: data => request.post('/org/roles', data),
+  // 修改角色：{ code, name }
+  updateRole: (id, data) => request.put(`/org/roles/${id}`, data),
+  removeRole: id => request.delete(`/org/roles/${id}`),
+  // 角色当前持有的权限点（需企业上下文）→ { codes: string[] }
+  rolePermissions: id => request.get(`/org/roles/${id}/permissions`),
+  // 整体覆盖：{ codes: string[] }
+  setRolePermissions: (id, codes) => request.put(`/org/roles/${id}/permissions`, { codes }),
+
+  // { groups: { file: [{ name, code, highRisk }], ... }, total }
+  permissions: () => request.get('/org/permissions'),
+  // 企业资源池：{ list: [{ id, skuId, quotaGb, holderUserId, assignedAt }], total }
+  resources: () => request.get('/org/resources')
+}
+
+// ===== 用户与成员 =====
+export const userApi = {
+  // { keyword?, status?, deptId?, page, size }
+  // → { list: [{ id, username, nickname, enterpriseId, deptId, deptName, enterpriseRole, dataScope, status, lastLoginAt }], total }
+  list: params => request.get('/users', { params }),
+  // 更新成员：{ deptId?, dataScope?, roleIds? }（roleIds 是整体覆盖，不传则不动）
+  updateMember: (id, data) => request.put(`/users/${id}`, data),
+  // 该成员当前持有的资源
+  memberResources: id => request.get(`/users/${id}/resources`),
+  // 整体覆盖：{ resourceIds: number[] }
+  assignResources: (id, resourceIds) => request.put(`/users/${id}/resources`, { resourceIds })
+}
+
+
+// ===== 平台运维 =====
+export const platformApi = {
+  // { status?, page, size } → { list: [{ id, code, name, status, ownerUserId, expireAt, createdAt }], total }
+  enterprises: params => request.get('/admin/enterprises', { params })
+}

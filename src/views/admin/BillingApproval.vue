@@ -40,8 +40,8 @@
           <template #default="{ row }">
             <div class="op-actions">
               <template v-if="row.status === 'pending'">
-                <el-button link type="success" size="small" @click="handleApprove(row)"><el-icon><CircleCheck /></el-icon>通过</el-button>
-                <el-button link type="danger" size="small" @click="openReject(row)"><el-icon><CircleClose /></el-icon>驳回</el-button>
+                <el-button v-perm="'admin.increase.approve'" link type="success" size="small" @click="handleApprove(row)"><el-icon><CircleCheck /></el-icon>通过</el-button>
+                <el-button v-perm="'admin.increase.approve'" link type="danger" size="small" @click="openReject(row)"><el-icon><CircleClose /></el-icon>驳回</el-button>
               </template>
             </div>
           </template>

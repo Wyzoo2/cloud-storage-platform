@@ -11,18 +11,18 @@
         </el-breadcrumb>
       </div>
       <div class="breadcrumb-actions">
-        <el-button type="primary" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
-        <el-button @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
-        <el-button v-if="selectedRows.length > 0" type="warning" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
-        <el-button v-if="deleteCount > 0" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
+        <el-button v-perm="'file.upload'" type="primary" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
+        <el-button v-perm="'file.upload'" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
+        <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" type="warning" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
+        <el-button v-if="deleteCount > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
       </div>
     </div>
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-input v-model="searchText" placeholder="搜索当前页文件..." :prefix-icon="Search" clearable class="search-input" />
+        <el-input v-model="searchText" placeholder="搜索文件" :prefix-icon="Search" clearable class="search-input" />
       </div>
       <div class="toolbar-right">
-        <el-button v-if="fileStore.total > 0" type="danger" plain :loading="deleting" @click="handleDeleteAll"><el-icon><Delete /></el-icon><span>删除全部文件</span></el-button>
+        <el-button v-if="fileStore.total > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleDeleteAll"><el-icon><Delete /></el-icon><span>删除全部文件</span></el-button>
 
         <el-button-group class="view-switch">
           <el-button :type="viewMode === 'table' ? 'primary' : ''" @click="viewMode = 'table'"><el-icon><List /></el-icon></el-button>
@@ -51,9 +51,9 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
-              <el-button link type="primary" size="small" @click="handleDownload(row)"><el-icon><Download /></el-icon><span>下载</span></el-button>
-              <el-button link type="primary" size="small" @click="handleRename(row)"><el-icon><EditPen /></el-icon><span>重命名</span></el-button>
-              <el-popconfirm title="删除后进入回收站，确定？" width="220" @confirm="handleDelete(row.id)">
+              <el-button v-perm="'file.read'" link type="primary" size="small" @click="handleDownload(row)"><el-icon><Download /></el-icon><span>下载</span></el-button>
+              <el-button v-perm="'file.modify'" link type="primary" size="small" @click="handleRename(row)"><el-icon><EditPen /></el-icon><span>重命名</span></el-button>
+              <el-popconfirm v-if="canDeleteAny" title="删除后进入回收站，确定？" width="220" @confirm="handleDelete(row.id)">
                 <template #reference><el-button link type="danger" size="small"><el-icon><Delete /></el-icon><span>删除</span></el-button></template>
               </el-popconfirm>
             </div>
@@ -154,10 +154,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatSize, formatDate, mapFileNode, extToType } from '@/utils/file'
 import { uploadApi } from '@/api'
 import { useTransferStore } from '@/stores/transfer'
+import { usePermissionStore } from '@/stores/permission'
 
 const fileStore = useFileStore()
 const userStore = useUserStore()
 const transfer = useTransferStore()
+const perm = usePermissionStore()
 const searchText = ref('')
 const sortField = ref('updatedAt')
 const sortOrder = ref('descending')
@@ -203,16 +205,18 @@ onMounted(() => {
   fileStore.loadDir(0, 1, pageSize.value, 'updatedAt,desc')
 })
 
-// 搜索为当前页本地处理（后端暂无搜索接口；排序已改为后端）
-const filteredFiles = computed(() => {
-  let list = [...fileStore.files]
-  if (searchText.value) list = list.filter(f => f.name.toLowerCase().includes(searchText.value.toLowerCase()))
-  return list
+// 搜索走后端（GET /files?keyword=），不在本地过滤当前页；排序同样交后端
+const filteredFiles = computed(() => fileStore.files)
+
+let searchTimer = null
+watch(searchText, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => { currentPage.value = 1; reload() }, 300)
 })
 
 function reload() {
   const sort = `${sortField.value},${sortOrder.value === 'ascending' ? 'asc' : 'desc'}`
-  fileStore.loadDir(fileStore.currentParentId, currentPage.value, pageSize.value, sort)
+  fileStore.loadDir(fileStore.currentParentId, currentPage.value, pageSize.value, sort, searchText.value.trim())
 }
 
 function handleSortChange({ prop, order }) {
@@ -229,6 +233,8 @@ function topLevelItems(items) {
 }
 
 // 实际要删除的顶层节点数（删除按钮显示用）
+// 删除按钮：自己的文件需 file.delete，他人可见范围需 file.other.delete（列表不带归属，二者其一即可）
+const canDeleteAny = computed(() => perm.can(['file.delete', 'file.other.delete']))
 const deleteCount = computed(() => topLevelItems(selectedRows.value).length)
 
 // 树形表格：给每行标记 hasChildren（文件夹才能展开）
@@ -240,7 +246,6 @@ const tableFiles = computed(() => {
 const loadedKids = new Map()
 const nodeById = new Map()
 const checkedDirs = new Set()
-const skipCascadeFor = new Set()
 let isCascading = false
 let unlinking = false
 
@@ -563,20 +568,6 @@ let uploadBatchFlush = null
 
 // 受控上传文件列表：用于把「上传中」的文件排到最上面
 const uploadFileList = ref([])
-function uploadSortKey(f) {
-  if (f.status === 'ready' || f.status === 'uploading') return 0
-  if (f.status === 'success') return 1
-  return 2
-}
-watch(uploadFileList, (_list) => {
-  return; // ⚠ 禁用排序重排，避免 el-upload 内部重建文件列表导致重复 on-change
-  for (let i = 0; i < list.length; i++) {
-    if (sorted[i].uid !== list[i].uid) {
-      uploadFileList.value = sorted
-      return
-    }
-  }
-}, { deep: true })
 
 function onUploadChange(file, fileList) {
   const raw = file.raw || file

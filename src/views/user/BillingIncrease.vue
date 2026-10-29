@@ -69,7 +69,7 @@
           <el-input v-model="remark" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="如：项目组扩容" maxlength="500" show-word-limit />
         </div>
       </div>
-      <el-button type="primary" :loading="submitting" @click="handleSubmit">提交申请</el-button>
+      <el-button v-perm="'increase.apply'" type="primary" :loading="submitting" @click="handleSubmit">提交申请</el-button>
     </div>
 
     <!-- 计费与收费规则 -->

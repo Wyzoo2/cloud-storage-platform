@@ -2,25 +2,22 @@
   <div class="cs-page">
     <div class="breadcrumb-bar">
       <div class="breadcrumb-left">
-        <span class="page-title">回收站</span>
+        <span class="page-title"><el-icon><Delete /></el-icon>回收站</span>
       </div>
       <div class="breadcrumb-actions">
-        <el-button v-if="selectedRows.length > 0" type="primary" @click="openRestoreDialog(null)">
+        <el-button v-if="selectedRows.length > 0" v-perm="'recycle.restore'" type="primary" @click="openRestoreDialog(null)">
           <el-icon><RefreshRight /></el-icon><span>批量恢复（{{ selectedRows.length }}）</span>
         </el-button>
-        <el-button v-if="selectedRows.length > 0" type="danger" plain :loading="deleting" @click="handleBatchDelete">
+        <el-button v-if="selectedRows.length > 0" v-perm="'recycle.purge'" type="danger" plain :loading="deleting" @click="handleBatchDelete">
           <el-icon><Delete /></el-icon><span>彻底删除（{{ selectedRows.length }}）</span>
         </el-button>
-        <el-button v-if="recycleTotal > 0" type="danger" plain :loading="deleting" @click="handleDeleteAll">
+        <el-button v-if="recycleTotal > 0" v-perm="'recycle.purge'" type="danger" plain :loading="deleting" @click="handleDeleteAll">
           <el-icon><Delete /></el-icon><span>删除全部文件</span>
         </el-button>
       </div>
     </div>
 
     <div class="toolbar">
-      <div class="toolbar-left">
-        <el-input v-model="searchText" placeholder="搜索回收站..." :prefix-icon="Search" clearable class="search-input" />
-      </div>
       <div class="toolbar-right">
         <el-tag type="info">30 天后自动清理</el-tag>
       </div>
@@ -36,7 +33,7 @@
         :lazy="lazyMode"
         :load="loadChildren"
         :tree-props="{ checkStrictly: true, children: 'children', hasChildren: 'hasChildren' }"
-        :default-expand-all="searchActive && !lazyMode"
+        :default-expand-all="!lazyMode"
         style="width: 100%; min-width: 760px"
         @selection-change="handleSelectionChange"
         @select="onRowSelect"
@@ -62,10 +59,10 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
-              <el-button link type="primary" size="small" @click="openRestoreDialog(row)">
+              <el-button v-perm="'recycle.restore'" link type="primary" size="small" @click="openRestoreDialog(row)">
                 <el-icon><RefreshRight /></el-icon><span>恢复</span>
               </el-button>
-              <el-popconfirm title="彻底删除后无法恢复，确定？" width="220" @confirm="handlePermanentDelete(row)">
+              <el-popconfirm v-if="perm.can('recycle.purge')" title="彻底删除后无法恢复，确定？" width="220" @confirm="handlePermanentDelete(row)">
                 <template #reference>
                   <el-button link type="danger" size="small">
                     <el-icon><Delete /></el-icon><span>彻底删除</span>
@@ -116,14 +113,15 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fileApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { usePermissionStore } from '@/stores/permission'
 import { mapFileNode, formatSize, formatDate } from '@/utils/file'
 
 const userStore = useUserStore()
+const perm = usePermissionStore()
 
 // ===== 数据状态 =====
 // 后端 trash 实测（2026-09-21）：
@@ -138,7 +136,6 @@ const pagedTotal = ref(0)                 // 懒加载模式：根层 total
 const currentPage = ref(1)
 const pageSize = ref(10)                  // 默认每页 10 条
 const loading = ref(false)
-const searchText = ref('')
 const selectedRows = ref([])
 const deleting = ref(false)
 const tableRef = ref(null)
@@ -155,7 +152,6 @@ const restoreRow = ref(null)     // 单条恢复时的行；批量恢复时为 n
 const restoreBatch = ref(false)
 
 const lazyMode = computed(() => parentFilterSupported.value)
-const searchActive = computed(() => searchText.value.trim() !== '')
 
 onMounted(async () => {
   parentFilterSupported.value = await detectParentFilter()
@@ -198,7 +194,6 @@ async function loadPage(page = currentPage.value) {
 const loadedKids = new Map()
 const nodeById = new Map()
 const checkedDirs = new Set()
-const skipCascadeFor = new Set()
 let isCascading = false
 let unlinking = false
 
@@ -332,47 +327,16 @@ const recycleRoots = computed(() => buildTree(allTrashNodes.value))
 // 顶层总数（分页用）：懒加载模式用后端 total，全量模式用顶层节点数
 const recycleTotal = computed(() => lazyMode.value ? pagedTotal.value : recycleRoots.value.length)
 
-// 搜索：匹配节点 + 其祖先链（保证结果的层级路径完整，仅全量模式）
-function familyOf(matchedIds) {
-  const idMap = new Map(allTrashNodes.value.map(n => [n.id, n]))
-  const keep = new Set(matchedIds)
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const id of [...keep]) {
-      const n = idMap.get(id)
-      if (n && n.parentId && idMap.has(n.parentId) && !keep.has(n.parentId)) {
-        keep.add(n.parentId)
-        changed = true
-      }
-    }
-  }
-  return allTrashNodes.value.filter(n => keep.has(n.id))
-}
-
 // 展示的顶层数组
 const tableFiles = computed(() => {
   if (lazyMode.value) {
     // 懒加载模式：根层当前页（后端已按 parent=0 分页），展开由 :load 下钻
-    let list = [...recycleRows.value]
-    if (searchActive.value) {
-      const kw = searchText.value.trim().toLowerCase()
-      list = list.filter(f => f.name.toLowerCase().includes(kw))
-    }
-    return list.map(f => ({ ...f, hasChildren: f.isDir }))
+    return recycleRows.value.map(f => ({ ...f, hasChildren: f.isDir }))
   }
   // 全量模式：本地建树
-  if (searchActive.value) {
-    const kw = searchText.value.trim().toLowerCase()
-    const matched = allTrashNodes.value.filter(n => n.name.toLowerCase().includes(kw)).map(n => n.id)
-    return buildTree(familyOf(matched))
-  }
   const start = (currentPage.value - 1) * pageSize.value
   return recycleRoots.value.slice(start, start + pageSize.value)
 })
-
-// 搜索切换时重建表格，让 default-expand-all 重新生效（全量模式搜索态全展开）
-watch(searchText, () => { tableKey.value++ })
 
 // 统一刷新入口（恢复/删除后调用）：重建表格并清空树形缓存，确保展开的子列表也更新
 async function refresh() {
@@ -551,7 +515,6 @@ function getFileIconColor(file) {
 .file-table { overflow-x: auto; }
 .pagination-bar { display: flex; justify-content: flex-end; margin-top: 12px; }
 .expire-text { color: var(--cs-warning); }
-.search-input { width: 240px; }
 
 /* ===== 树形表格样式（对齐文件管理页：展开箭头在文件名左侧同行，而非上方） ===== */
 .file-table :deep(.el-table__row .cell) {
@@ -587,7 +550,6 @@ function getFileIconColor(file) {
 .file-table :deep(.el-table__row--level-3) { background-color: #f0f2f5; }
 
 /* 工具栏：左搜索框 + 右提示，三端统一 flex 排列 */
-.toolbar-left { display: flex; align-items: center; flex: 1; min-width: 0; }
 .toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 /* 面包屑左侧：返回上一级 + 面包屑 */
@@ -613,8 +575,6 @@ function getFileIconColor(file) {
 @media (max-width: 768px) {
   .breadcrumb-bar { flex-wrap: wrap; gap: 12px; }
   .toolbar { gap: 10px; }
-  .toolbar-left { flex: 1 1 100%; }
-  .search-input { width: 100%; }
   .toolbar-right { width: 100%; justify-content: flex-start; }
 }
 </style>
