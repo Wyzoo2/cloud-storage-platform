@@ -44,3 +44,12 @@ export function formatDate(iso) {
   if (isNaN(d.getTime())) return '--'
   return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
+//多z
+export function formatDateNo8(iso) {
+  if (!iso) return '--'
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(iso))
+  if (!m) return '--'
+  const [, y, mo, d, h, mi] = m
+  if (y === '0001') return '--'          // 顺手挡掉 Go/.NET 的零值
+  return `${y}-${mo}-${d} ${h}:${mi}`
+}

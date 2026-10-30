@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { usePermissionStore } from '@/stores/permission'
 import { landingPath, HOME_PATHS } from '@/utils/landing'
-import { FILE_SIDE_PERMS, ADMIN_SIDE_PERMS } from '@/constants/menus'
+import { ADMIN_SIDE_PERMS } from '@/constants/menus'
 
 // meta.perm 声明该路由需要的权限点（数组=任一命中）；守卫按 /me/context 的 perms 判定
 const routes = [
@@ -10,7 +10,7 @@ const routes = [
   {
     path: '/', component: () => import('@/layouts/UserLayout.vue'), meta: { requiresAuth: true }, redirect: '/files',
     children: [
-      { path: 'files', name: 'FileList', component: () => import('@/views/user/FileList.vue'), meta: { title: '我的文件', perm: FILE_SIDE_PERMS } },
+      { path: 'files', name: 'FileList', component: () => import('@/views/user/FileList.vue'), meta: { title: '我的文件', perm: 'file.read' } },
       { path: 'transfers', name: 'Transfers', component: () => import('@/views/user/Transfers.vue'), meta: { title: '传输任务', perm: 'transfer.read' } },
       { path: 'recycle', name: 'RecycleBin', component: () => import('@/views/user/RecycleBin.vue'), meta: { title: '回收站', perm: 'recycle.read' } },
       { path: 'billing', name: 'BillingIncrease', component: () => import('@/views/user/BillingIncrease.vue'), meta: { title: '增额申请', perm: ['increase.apply', 'increase.read'] } },

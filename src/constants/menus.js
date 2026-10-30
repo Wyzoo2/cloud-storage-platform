@@ -22,14 +22,6 @@ export const ADMIN_SIDE_PERMS = [
   'admin.dashboard.read', 'admin.dashboard.export'
 ]
 
-// 文件/回收站类权限：任意一项即可进入「我的文件」
-// （浏览范围本身由 dataScope 决定，这里只判断"是否具备使用网盘的能力"；
-//   企业管理员若没绑成员角色，只有管理端权限，就不该出现「我的文件」入口）
-export const FILE_SIDE_PERMS = [
-  'file.read', 'file.upload', 'file.modify', 'file.delete', 'file.other.delete',
-  'recycle.read', 'recycle.restore', 'recycle.purge'
-]
-
 export const ADMIN_MENUS = [
   // ===== 企业管理员：企业详情置顶 =====
   { path: '/admin/enterprise', title: '企业详情', icon: 'OfficeBuilding', perm: ADMIN_SIDE_PERMS, scope: 'enterprise' },
@@ -64,7 +56,7 @@ export const ADMIN_MENUS = [
 
 
 export const USER_MENUS = [
-  { path: '/files', title: '我的文件', icon: 'FolderOpened', perm: FILE_SIDE_PERMS, scope: 'both' },
+  { path: '/files', title: '我的文件', icon: 'FolderOpened', perm: 'file.read', scope: 'both' },
   { path: '/transfers', title: '传输任务', icon: 'Upload', perm: 'transfer.read', scope: 'both' },
   { path: '/recycle', title: '回收站', icon: 'Delete', perm: 'recycle.read', scope: 'both' },
   { path: '/billing', title: '增额申请', icon: 'Wallet', perm: ['increase.apply', 'increase.read'], scope: 'both' },

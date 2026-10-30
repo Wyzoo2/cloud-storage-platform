@@ -116,7 +116,9 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Plus } from '@element-plus/icons-vue'
 import { rbacSource } from '@/api/rbacSource'
+import { usePermissionStore } from '@/stores/permission'
 
+const perm = usePermissionStore()
 const roles = ref([])
 const rolesLoading = ref(false)
 const current = ref(null)
@@ -275,6 +277,8 @@ async function save() {
   saving.value = true
   try {
     await rbacSource.saveRolePermissions(current.value.id, draft.value)
+    // 权限每次请求实时校验：主动刷新自己的上下文，改到自己所在角色时菜单立即生效
+    await perm.load(true)
     original.value = [...draft.value]
     ElMessage.success('权限已保存')
     // 列表里的「N 项权限」随之刷新

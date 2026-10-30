@@ -41,10 +41,10 @@
           <template #default="{ row }">{{ row.memberCount == null ? '--' : row.memberCount }}</template>
         </el-table-column>
         <el-table-column label="到期时间" width="180">
-          <template #default="{ row }">{{ row.expireAt ? formatDate(row.expireAt) : '--' }}</template>
+          <template #default="{ row }">{{ row.expireAt ? formatDateNo8(row.expireAt) : '--' }}</template>
         </el-table-column>
         <el-table-column label="创建时间" width="180">
-          <template #default="{ row }">{{ row.createdAt ? formatDate(row.createdAt) : '--' }}</template>
+          <template #default="{ row }">{{ row.createdAt ? formatDateNo8(row.createdAt) : '--' }}</template>
         </el-table-column>
       </el-table>
     </div>
@@ -67,7 +67,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { rbacSource } from '@/api/rbacSource'
-import { formatDate } from '@/utils/file'
+import { formatDateNo8 } from '@/utils/file'
 
 const rows = ref([])
 const total = ref(0)
