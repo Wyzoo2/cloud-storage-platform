@@ -130,25 +130,6 @@ export const rbacSource = {
   },
   saveRolePermissions: (id, codes) => orgApi.setRolePermissions(id, codes),
 
-  async resources() {
-    const res = await orgApi.resources()
-    return {
-      total: res?.total ?? 0,
-      list: (res?.list || []).map(r => ({
-        id: r.id,
-        skuId: r.skuId,
-        quotaGb: r.quotaGb,
-        holderUserId: r.holderUserId ?? null
-      }))
-    }
-  },
-
-  async memberResources(id) {
-    const res = await userApi.memberResources(id)
-    return (res?.list || []).map(r => (r && typeof r === 'object' ? r.id : r)).filter(v => v != null)
-  },
-
-  assignResources: (id, resourceIds) => userApi.assignResources(id, resourceIds),
   async permissions() {
     const data = await orgApi.permissions()
     const groups = Object.entries(data?.groups || {}).map(([key, items]) => ({

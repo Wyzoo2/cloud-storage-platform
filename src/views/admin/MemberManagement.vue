@@ -82,22 +82,6 @@
       </div>
     </div>
 
-    <!-- 配置资源包 -->
-    <el-dialog v-model="resDialog" :title="`配置资源包 · ${form.nickname || form.username}`" width="520px" align-center destroy-on-close>
-      <div v-loading="resLoading" class="res-body">
-        <el-empty v-if="!resPool.length" description="企业暂无可用资源包" :image-size="70" />
-        <label v-for="r in resPool" :key="r.id" class="res-item" :class="{ 'res-item--locked': isResLocked(r) }">
-          <el-checkbox :model-value="resChecked.includes(r.id)" :disabled="isResLocked(r)" @change="v => toggleRes(r.id, v)" />
-          <span class="res-name">{{ r.skuId }}</span>
-          <span class="res-quota">{{ r.quotaGb }} GB</span>
-          <span v-if="isResLocked(r)" class="res-holder">已被其他成员占用</span>
-        </label>
-      </div>
-      <template #footer>
-        <el-button @click="resDialog = false">取消</el-button>
-        <el-button type="primary" :loading="resSaving" @click="saveResources">保存</el-button>
-      </template>
-    </el-dialog>
     <!-- 编辑成员：右侧抽屉 -->
     <el-drawer v-model="editDrawer" :title="`编辑成员 · ${form.nickname || form.username}`" size="480px" destroy-on-close>
       <div class="drawer-body">
@@ -126,13 +110,6 @@
           </el-select>
         </section>
 
-        <section class="form-card">
-          <h4 class="card-title">资源包 <span class="card-tip">决定该成员名下的存储容量</span></h4>
-          <div class="res-row">
-            <span class="res-summary">{{ currentResources.length ? '已分配 ' + currentResources.length + ' 个' : '未分配资源包' }}</span>
-            <el-button v-perm="'org.member.resource'" size="small" @click="openResources">配置资源包</el-button>
-          </div>
-        </section>
         <section class="form-card">
           <h4 class="card-title">
             数据权限
@@ -259,57 +236,6 @@ async function loadRoles() {
   }
 }
 
-/* ---------------- 资源包分配（/org/resources + /users/{id}/resources） ---------------- */
-const resDialog = ref(false)
-const resLoading = ref(false)
-const resSaving = ref(false)
-const resPool = ref([])
-const resChecked = ref([])
-const currentResources = ref([])
-
-async function openResources() {
-  resDialog.value = true
-  resLoading.value = true
-  try {
-    const [pool, mine] = await Promise.all([
-      rbacSource.resources(),
-      rbacSource.memberResources(current.value.id)
-    ])
-    resPool.value = pool.list
-    currentResources.value = mine
-    resChecked.value = [...mine]
-  } catch (e) {
-    resPool.value = []
-    resChecked.value = []
-  } finally {
-    resLoading.value = false
-  }
-}
-
-// 已被其他成员持有的不可勾选
-function isResLocked(r) {
-  return r.holderUserId != null && r.holderUserId !== current.value?.userId
-}
-
-function toggleRes(id, checked) {
-  resChecked.value = checked
-    ? [...resChecked.value, id]
-    : resChecked.value.filter(x => x !== id)
-}
-
-async function saveResources() {
-  resSaving.value = true
-  try {
-    await rbacSource.assignResources(current.value.id, resChecked.value)
-    currentResources.value = [...resChecked.value]
-    ElMessage.success('资源包已更新')
-    resDialog.value = false
-  } catch (e) {
-    // 拦截器已提示
-  } finally {
-    resSaving.value = false
-  }
-}
 /* ---------------- 编辑成员 ---------------- */
 const editDrawer = ref(false)
 const saving = ref(false)
@@ -334,8 +260,6 @@ function openEdit(row) {
     roleId: initialRoleId(row)
   }
   editDrawer.value = true
-  currentResources.value = []
-  rbacSource.memberResources(row.id).then(ids => { currentResources.value = ids }).catch(() => {})
 }
 
 async function saveEdit() {
@@ -415,15 +339,6 @@ onMounted(async () => {
 .info-label { width: 40px; flex: none; color: var(--cs-text-tertiary); font-size: 12px; }
 .mono { font-family: Consolas, monospace; font-size: 12.5px; }
 .drawer-footer { display: flex; justify-content: flex-end; gap: 8px; }
-.res-row { display: flex; align-items: center; gap: 12px; }
-.res-summary { flex: 1; font-size: 12.5px; color: var(--cs-text-tertiary); }
-.res-body { max-height: 46vh; overflow: auto; }
-.res-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; margin-bottom: 6px; cursor: pointer;
-  border: 1px solid var(--cs-border-light); border-radius: var(--cs-radius); font-size: 13px; color: var(--cs-text-primary); }
-.res-item--locked { opacity: .6; cursor: not-allowed; }
-.res-name { flex: none; font-weight: 600; }
-.res-quota { color: var(--cs-text-tertiary); font-size: 12.5px; }
-.res-holder { margin-left: auto; font-size: 11.5px; color: var(--cs-text-tertiary); }
 
 /* 数据权限卡 */
 .scope-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); gap: 8px; width: 100%; }

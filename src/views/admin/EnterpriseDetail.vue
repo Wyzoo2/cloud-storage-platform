@@ -50,63 +50,9 @@
         <span class="stat-label">角色数</span>
         <span class="stat-value">{{ metrics.roles }}</span>
       </div>
-      <div class="stat-card">
-        <span class="stat-label">资源包</span>
-        <span class="stat-value">{{ metrics.resourceCount }}<span class="unit"> 个 · {{ metrics.resourceGb }} GB</span></span>
-      </div>
     </div>
 
     <div class="stack">
-
-      <!-- 资源包 -->
-        <div class="cs-card panel">
-          <div class="panel-head">
-            <span>资源包</span>
-            <span class="panel-count">{{ resources.length }} 个 · 合计 {{ resStats.totalGb }} GB</span>
-          </div>
-          <div class="res-summary">
-            <div class="res-sum-item">
-              <span class="res-sum-label">已分配</span>
-              <span class="res-sum-value">{{ resStats.assignedCount }} 个 · {{ resStats.assignedGb }} GB</span>
-            </div>
-            <div class="res-sum-item">
-              <span class="res-sum-label">未分配</span>
-              <span class="res-sum-value">{{ resStats.unassignedCount }} 个 · {{ resStats.unassignedGb }} GB</span>
-            </div>
-            <div class="res-sum-item">
-              <span class="res-sum-label">可用总量</span>
-              <span class="res-sum-value">{{ resStats.totalGb }} GB</span>
-            </div>
-          </div>
-          <div class="panel-body" v-loading="resLoading">
-            <el-table v-if="resources.length" :data="resources" size="small" style="width: 100%">
-              <el-table-column label="规格" min-width="130">
-                <template #default="{ row }">
-                  <el-tag size="small" effect="plain">{{ row.skuId || '--' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="容量" width="90" align="right">
-                <template #default="{ row }">{{ row.quotaGb }} GB</template>
-              </el-table-column>
-              <el-table-column label="状态" width="90">
-                <template #default="{ row }">
-                  <el-tag size="small" :type="row.holderUserId ? 'success' : 'info'" effect="plain">
-                    {{ row.holderUserId ? '已分配' : '未分配' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="持有人" width="130">
-                <template #default="{ row }">
-                  <span :class="{ muted: !row.holderName }">{{ row.holderName || (row.holderUserId ? 'ID ' + row.holderUserId : '未分配') }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="分配时间" width="160">
-                <template #default="{ row }">{{ row.assignedAt ? formatDate(row.assignedAt) : '--' }}</template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else description="暂无资源包" :image-size="70" />
-          </div>
-        </div>
 
       <!-- 最近操作 -->
       <div class="cs-card panel side-panel">
@@ -155,61 +101,20 @@ const statusLabel = computed(() => STATUS[ent.value.status]?.label || ent.value.
 const statusType = computed(() => STATUS[ent.value.status]?.type || 'info')
 
 /* ---------------- 指标 ---------------- */
-const metrics = ref({ members: '--', depts: '--', roles: '--', resourceCount: 0, resourceGb: 0 })
+const metrics = ref({ members: '--', depts: '--', roles: '--' })
 
 async function loadMetrics() {
-  const [members, depts, roles, resources] = await Promise.all([
+  const [members, depts, roles] = await Promise.all([
     rbacSource.members({ page: 1, size: 1 }).catch(() => ({ total: '--' })),
     rbacSource.depts().catch(() => ({ total: '--' })),
-    rbacSource.roles().catch(() => []),
-    rbacSource.resources().catch(() => ({ total: 0, list: [] }))
+    rbacSource.roles().catch(() => [])
   ])
-  const gb = (resources.list || []).reduce((a, r) => a + Number(r.quotaGb || 0), 0)
   metrics.value = {
     members: members?.total ?? '--',
     depts: depts?.total ?? '--',
-    roles: Array.isArray(roles) ? roles.length : '--',
-    resourceCount: resources?.total ?? (resources.list || []).length,
-    resourceGb: gb
+    roles: Array.isArray(roles) ? roles.length : '--'
   }
 }
-
-/* ---------------- 资源包 ---------------- */
-const resources = ref([])
-const resLoading = ref(false)
-// userId → 展示名，仅用于资源包持有人（接口只给 holderUserId，没有名字）
-const nameById = ref({})
-
-async function loadResources() {
-  resLoading.value = true
-  try {
-    const res = await rbacSource.resources()
-    try {
-      const users = await rbacSource.members({ page: 1, size: 100 })
-      nameById.value = Object.fromEntries((users.list || []).map(u => [u.id, u.nickname || u.username]))
-    } catch (e) { /* 忽略 */ }
-    resources.value = (res.list || []).map(r => ({ ...r, holderName: nameById.value[r.holderUserId] || '' }))
-  } catch (e) {
-    resources.value = []
-  } finally {
-    resLoading.value = false
-  }
-}
-
-const resStats = computed(() => {
-  const list = resources.value
-  const gb = r => Number(r.quotaGb || 0)
-  const assigned = list.filter(r => r.holderUserId != null)
-  const unassigned = list.filter(r => r.holderUserId == null)
-  const sum = arr => arr.reduce((a, r) => a + gb(r), 0)
-  return {
-    totalGb: sum(list),
-    assignedCount: assigned.length,
-    assignedGb: sum(assigned),
-    unassignedCount: unassigned.length,
-    unassignedGb: sum(unassigned)
-  }
-})
 
 /* ---------------- 最近操作 ---------------- */
 const logs = ref([])
@@ -244,7 +149,7 @@ function actionType(a) {
 async function refreshAll() {
   refreshing.value = true
   try {
-    await Promise.all([loadMetrics(), loadResources()])
+    await loadMetrics()
     await loadLogs()
   } finally {
     refreshing.value = false
@@ -272,7 +177,7 @@ onMounted(refreshAll)
 .hero-value { font-size: 13px; color: var(--cs-text-primary); font-weight: 500; }
 
 /* 指标 */
-.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.stat-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .stat-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--cs-radius-lg);
   background: var(--cs-bg-container); box-shadow: var(--cs-shadow-sm); }
 .stat-label { font-size: 12px; color: var(--cs-text-tertiary); }
@@ -287,10 +192,6 @@ onMounted(refreshAll)
   border-bottom: 1px solid var(--cs-border-light); font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
 .panel-count { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--cs-text-tertiary); }
 .panel-body { padding: 14px 16px 16px; }
-.res-summary { display: flex; gap: 30px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px dashed var(--cs-border-light); }
-.res-sum-item { display: flex; align-items: baseline; gap: 8px; }
-.res-sum-label { font-size: 11.5px; color: var(--cs-text-tertiary); }
-.res-sum-value { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
 .side-panel .panel-body { padding: 6px 12px 12px; }
 
 /* 最近操作 */

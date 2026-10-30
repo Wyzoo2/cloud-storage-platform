@@ -169,9 +169,7 @@ export const orgApi = {
   setRolePermissions: (id, codes) => request.put(`/org/roles/${id}/permissions`, { codes }),
 
   // { groups: { file: [{ name, code, highRisk }], ... }, total }
-  permissions: () => request.get('/org/permissions'),
-  // 企业资源池：{ list: [{ id, skuId, quotaGb, holderUserId, assignedAt }], total }
-  resources: () => request.get('/org/resources')
+  permissions: () => request.get('/org/permissions')
 }
 
 // ===== 用户与成员 =====
@@ -181,10 +179,6 @@ export const userApi = {
   list: params => request.get('/users', { params }),
   // 更新成员：{ deptId?, dataScope?, roleIds? }（roleIds 是整体覆盖，不传则不动）
   updateMember: (id, data) => request.put(`/users/${id}`, data),
-  // 该成员当前持有的资源
-  memberResources: id => request.get(`/users/${id}/resources`),
-  // 整体覆盖：{ resourceIds: number[] }
-  assignResources: (id, resourceIds) => request.put(`/users/${id}/resources`, { resourceIds })
 }
 
 
