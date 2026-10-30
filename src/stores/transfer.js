@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fetchUploadTasks, fetchUploadTaskDetail, deleteUploadTask, clearCompletedUploadTasks } from '@/utils/uploadTaskStore'
+import { usePermissionStore } from '@/stores/permission'
 import { getCachedFile, removeCachedFile, cacheFile } from '@/utils/uploadFileStore'
 import { uploadFile } from '@/utils/upload'
 import { uploadApi } from '@/api'
@@ -44,6 +45,8 @@ export const useTransferStore = defineStore('transfer', () => {
 
   // ---- 后端列表刷新（后端分页：按当前页查询，默认每页 10 条；排序在前端做）----
   async function refresh() {
+    // 没有 transfer.read 时后端会 40301，这里直接跳过，避免整页弹「缺少权限」
+    if (!usePermissionStore().can('transfer.read')) return
     try {
       const res = await fetchUploadTasks({ page: page.value - 1, size: pageSize.value })
       remoteTasks.value = (res.list || []).map(t => ({

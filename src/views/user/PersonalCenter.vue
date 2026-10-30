@@ -130,10 +130,10 @@ const extraUsedPct = computed(() => extraBytes.value > 0 ? Math.min(100, (Math.m
 onMounted(() => {
   // 刷新配额（/auth/profile）
   userStore.loadProfile().catch(() => {})
-  // 计费额度（/billing/quota）
-  billing.loadQuota().catch(() => {})
+  // 计费额度（/billing/quota）：缺 quota.read 时跳过，避免弹「缺少权限」
+  if (perm.can('quota.read')) billing.loadQuota().catch(() => {})
   // 个人存储统计（/stats/overview）
-  statsApi.overview().then(s => {
+  if (perm.can('quota.read')) statsApi.overview().then(s => {
     stats.value = { totalFiles: s.totalFiles || 0, totalDirs: s.totalDirs || 0, recycleCount: s.recycleCount || 0 }
   }).catch(() => {})
 })

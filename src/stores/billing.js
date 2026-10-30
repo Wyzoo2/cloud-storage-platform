@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { billingApi } from '@/api/billing'
+import { usePermissionStore } from '@/stores/permission'
 
 export const useBillingStore = defineStore('billing', () => {
   // 计费配置：免费额度 + 单价（分/GB/月）
@@ -18,15 +19,21 @@ export const useBillingStore = defineStore('billing', () => {
   // 可用总额度 = 免费 + 增量
   const totalBytes = computed(() => (quota.value.freeBytes || 0) + (quota.value.extraBytes || 0))
 
+  // 缺权限点时不发请求（避免整页弹「缺少权限：xxx」），由页面按需降级
+  const allowed = code => usePermissionStore().can(code)
+
   async function loadConfig() {
+    if (!allowed('billing.read')) return
     config.value = await billingApi.getConfig()
   }
 
   async function loadQuota() {
+    if (!allowed('quota.read')) return
     quota.value = await billingApi.getQuota()
   }
 
   async function loadRequests(page = 1, size = 5) {
+    if (!allowed('increase.read')) return
     // 后端已支持真分页：page 从 1 起，返回 { records, total, size, current, pages }，每次只拉当前页
     loading.value = true
     try {

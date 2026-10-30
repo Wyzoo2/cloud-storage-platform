@@ -6,7 +6,8 @@ export const authApi = {
   login: data => request.post('/auth/login', data),
   // 管理端登录：请求体 / 响应体与 login 完全一致，但后端只校验本地管理员密码，不调用门户账号服务
   adminLogin: data => request.post('/admin/login', data),
-  logout: () => request.post('/auth/logout'),
+  // 登出时会话可能已失效（后端返回 401），silent 避免提示"登录已过期"
+  logout: () => request.post('/auth/logout', null, { silent: true }),
   // 已按需求停用：修改密码接口（恢复时取消注释）
   // changePassword: data => request.post('/auth/change-password', data),
   profile: () => request.get('/auth/profile'),

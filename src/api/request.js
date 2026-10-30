@@ -32,6 +32,20 @@ const LOGIN_ERRORS = {
   42902: '登录过于频繁，请稍后再试'
 }
 
+// 40301 去重：同一句提示 6 秒内只弹一次（页面初始化时多个接口同时缺权限，避免连弹 4 条）
+const recentTips = new Map()
+function failOnce(message, silent) {
+  const msg = message || '请求失败'
+  const now = Date.now()
+  if (now - (recentTips.get(msg) || 0) < 6000) return Promise.reject(new Error(msg))
+  recentTips.set(msg, now)
+  if (recentTips.size > 50) recentTips.clear()
+  return fail(msg, silent)
+}
+
+// 登出接口返回 401 属于正常（会话已失效）：不提示"登录已过期"、不刷新令牌、不跳转
+const isLogoutRequest = config => String(config?.url || '').includes('/auth/logout')
+
 function fail(message, silent) {
   const msg = message || '请求失败'
   if (!silent) ElMessage.error(msg)
@@ -39,7 +53,10 @@ function fail(message, silent) {
 }
 
 /** 刷新权限上下文：动态引入避免 store ↔ api 循环依赖 */
+let lastPermRefresh = 0
 function refreshPermissions() {
+  if (Date.now() - lastPermRefresh < 6000) return
+  lastPermRefresh = Date.now()
   import('@/stores/permission')
     .then(m => m.usePermissionStore().load(true))
     .catch(() => {})
@@ -85,6 +102,7 @@ request.interceptors.response.use(
     const { code, message } = body
     const silent = !!response.config?.silent
     if (code === 0) return body.data
+    if (isLogoutRequest(response.config)) return Promise.reject(new Error(message || 'logout'))
 
     // 登录类错误：只提示，不刷新令牌、不跳登录（否则会把"密码错误"变成"登录已过期"）
     if (LOGIN_ERRORS[code]) return fail(message || LOGIN_ERRORS[code], silent)
@@ -96,7 +114,7 @@ request.interceptors.response.use(
     }
     if (code === 40301) {
       refreshPermissions()
-      return fail(message || '无权限访问', silent)
+      return failOnce(message || '无权限访问', silent)
     }
     // 40400：后端明确"接口不存在"（通常是新功能还没上线），给一句能看懂的话
     if (code === 40400) {
@@ -112,6 +130,8 @@ request.interceptors.response.use(
     const status = error.response?.status
     const bodyCode = error.response?.data?.code
     const silent = !!error.config?.silent
+
+    if (isLogoutRequest(error.config)) return Promise.reject(error)
 
     // 登录类错误可能以 HTTP 401 返回，必须排在下面的 401 分支之前
     if (LOGIN_ERRORS[bodyCode]) {

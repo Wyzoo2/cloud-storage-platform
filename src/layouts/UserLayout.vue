@@ -126,9 +126,10 @@ function updateViewport() {
 
 onMounted(() => {
   updateViewport()
-  notifyPendingTransfers()
+  // 只在该账号具备对应权限时才发请求，避免缺权限的账号一进页面就连弹提示
+  if (perm.can('transfer.read')) notifyPendingTransfers()
   userStore.loadProfile().catch(() => {})
-  billingStore.loadQuota().catch(() => {})
+  if (perm.can('quota.read')) billingStore.loadQuota().catch(() => {})
   // 平板端（≤1024 且 >768）默认折叠侧边栏
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
     appStore.sidebarCollapsed = true
