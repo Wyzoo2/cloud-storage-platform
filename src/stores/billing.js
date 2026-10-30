@@ -11,6 +11,10 @@ export const useBillingStore = defineStore('billing', () => {
   // 三段额度：个人免费 / 个人增量 / 企业分配（后端 /billing/quota 已拆开返回）
   const quota = ref({ personalBytes: 0, freeBytes: 0, extraBytes: 0, enterpriseBytes: 0, extraExpireAt: null, usedBytes: 0, uploadBlocked: false })
 
+  // 钱包余额（GET /billing/wallet）：只能查自己，状态区分「可查 / 本地账号不适用 / 查询失败」
+  const wallet = ref({ balanceCents: 0, balanceYuan: '0.00', status: 0, frozen: false, walletExists: false })
+  const walletState = ref('idle') // idle | ok | unsupported | error
+
   // 我的增额申请列表
   const requests = ref([])
   const reqTotal = ref(0)
@@ -36,6 +40,16 @@ export const useBillingStore = defineStore('billing', () => {
   async function loadQuota() {
     if (!allowed('quota.read')) return
     quota.value = await billingApi.getQuota()
+  }
+
+  async function loadWallet() {
+    try {
+      wallet.value = await billingApi.wallet()
+      walletState.value = 'ok'
+    } catch (e) {
+      // 本地账号无门户映射 → 不适用；门户不可用 → 降级不显示
+      walletState.value = String(e?.message || '').includes('未关联门户') ? 'unsupported' : 'error'
+    }
   }
 
   async function loadRequests(page = 1, size = 5) {
@@ -64,5 +78,5 @@ export const useBillingStore = defineStore('billing', () => {
     return billingApi.createIncrease({ gbCount, remark })
   }
 
-  return { config, quota, totalBytes, requests, reqTotal, reqPages, loading, loadConfig, loadQuota, loadRequests, loadRequestsForCheck, submitIncrease }
+  return { config, quota, totalBytes, wallet, walletState, requests, reqTotal, reqPages, loading, loadConfig, loadQuota, loadWallet, loadRequests, loadRequestsForCheck, submitIncrease }
 })

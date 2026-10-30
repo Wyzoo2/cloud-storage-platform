@@ -15,5 +15,9 @@ export const billingApi = {
   createIncrease: data => request.post('/billing/increase-requests', data),
 
   // GET /billing/increase-requests?page&size → { records, total, ... }
-  listIncrease: params => request.get('/billing/increase-requests', { params })
+  listIncrease: params => request.get('/billing/increase-requests', { params }),
+
+  // GET /billing/wallet → { balanceCents, balanceYuan, status, frozen, walletExists }
+  // 只能查自己；本地账号（无门户映射）返回 40000，silent 避免每次进页面弹提示
+  wallet: () => request.get('/billing/wallet', { silent: true })
 }

@@ -16,6 +16,25 @@
       <div class="account-row"><span class="account-label">数据范围</span><span>{{ scopeLabel(perm.dataScope) }}</span></div>
     </div>
     <div class="profile-grid">
+      <!-- 钱包余额（GET /billing/wallet，仅门户账号可查） -->
+      <div v-if="billing.walletState === 'ok'" class="cs-card wallet-card">
+        <div class="quota-header">
+          <h3>钱包余额</h3>
+          <el-tag :type="billing.wallet.frozen ? 'danger' : 'success'" size="small" effect="plain">
+            {{ billing.wallet.frozen ? '已冻结' : '正常' }}
+          </el-tag>
+        </div>
+        <div class="wallet-amount">
+          <span class="wallet-symbol">¥</span>
+          <span class="wallet-value">{{ billing.wallet.balanceYuan }}</span>
+        </div>
+        <div class="wallet-hint">
+          <template v-if="billing.wallet.frozen">账户已被冻结，扣费会被拒绝，请联系客服。</template>
+          <template v-else-if="!billing.wallet.walletExists">尚未开通钱包，余额为 0.00 元；首次充值后自动开通。</template>
+          <template v-else>余额用于购买存储空间，充值请在门户完成。</template>
+        </div>
+      </div>
+
       <div class="cs-card quota-card" v-perm="'quota.read'">
         <div class="quota-header">
           <h3>存储空间</h3>
@@ -153,6 +172,8 @@ onMounted(() => {
   userStore.loadProfile().catch(() => {})
   // 计费额度（/billing/quota）：缺 quota.read 时跳过，避免弹「缺少权限」
   if (perm.can('quota.read')) billing.loadQuota().catch(() => {})
+  // 钱包余额：仅门户账号可查，失败静默降级（不阻止任何操作）
+  billing.loadWallet()
   // 个人存储统计（/stats/overview）
   if (perm.can('quota.read')) statsApi.overview().then(s => {
     stats.value = { totalFiles: s.totalFiles || 0, totalDirs: s.totalDirs || 0, recycleCount: s.recycleCount || 0 }
@@ -183,6 +204,11 @@ onMounted(() => {
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }
 .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 .quota-card { grid-column: 1 / -1; padding: 24px; }
+.wallet-card { grid-column: 1 / -1; padding: 20px 24px; }
+.wallet-amount { display: flex; align-items: baseline; gap: 4px; margin: 10px 0 6px; }
+.wallet-symbol { font-size: 18px; font-weight: 600; color: var(--cs-text-primary); }
+.wallet-value { font-size: 30px; font-weight: 700; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+.wallet-hint { font-size: 12px; color: var(--cs-text-tertiary); line-height: 1.6; }
 .password-card, .info-card { padding: 24px; }
 .password-card h3, .info-card h3, .quota-card h3 { font-size: 16px; font-weight: 600; color: var(--cs-text-primary); margin: 0; }
 .quota-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
