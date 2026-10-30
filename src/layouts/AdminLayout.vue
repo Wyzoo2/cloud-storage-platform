@@ -72,7 +72,9 @@
           <transition name="fade" mode="out-in"><component :is="Component" /></transition>
         </router-view>
       </main>
-      <ForcePasswordDialog />
+    <!-- 已按需求停用：强制改密弹框（恢复时取消注释）
+    <ForcePasswordDialog />
+    -->
     </div>
   </div>
 </template>
@@ -84,7 +86,8 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { ADMIN_MENUS, USER_MENUS, filterMenus } from '@/constants/menus'
-import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
+// 已按需求停用：强制改密弹框
+// import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
 
 const route = useRoute()
 const router = useRouter()

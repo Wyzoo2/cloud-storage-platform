@@ -7,7 +7,8 @@ export const authApi = {
   // 管理端登录：请求体 / 响应体与 login 完全一致，但后端只校验本地管理员密码，不调用门户账号服务
   adminLogin: data => request.post('/admin/login', data),
   logout: () => request.post('/auth/logout'),
-  changePassword: data => request.post('/auth/change-password', data),
+  // 已按需求停用：修改密码接口（恢复时取消注释）
+  // changePassword: data => request.post('/auth/change-password', data),
   profile: () => request.get('/auth/profile'),
   me: () => request.get('/user/me'),
   // 刷新 token：{ refreshToken } → LoginResponse

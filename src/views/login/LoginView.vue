@@ -80,7 +80,8 @@ async function handleLogin() {
     // 两者请求体与成功响应体（{ accessToken, refreshToken, user }）完全一致
     const res = portal.value === 'admin' ? await authApi.adminLogin(payload) : await authApi.login(payload)
     userStore.login(res)
-    if (res.user?.mustChangePassword) ElMessage.warning('当前密码为初始密码，请尽快在个人中心修改')
+    // 已按需求停用：改密提示（恢复时取消注释）
+    // if (res.user?.mustChangePassword) ElMessage.warning('当前密码为初始密码，请尽快在个人中心修改')
     // 先拿权限上下文，再决定去管理端还是用户端    
     const perm = usePermissionStore()
     await perm.load(true)

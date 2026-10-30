@@ -65,6 +65,7 @@
           <div class="quota-stat-item"><el-icon :size="20" color="var(--cs-warning)"><Delete /></el-icon><div><div class="stat-num">{{ stats.recycleCount }}</div><div class="stat-label">回收站</div></div></div>
         </div>
       </div>
+      <!-- 已按需求停用：修改密码功能（恢复时取消注释）
       <div class="cs-card password-card">
         <h3>修改密码</h3>
         <el-form :model="pwdForm" label-width="80px" style="margin-top: 20px">
@@ -74,6 +75,7 @@
           <el-form-item><el-button type="primary" :loading="changing" @click="handleChangePassword">确认修改</el-button></el-form-item>
         </el-form>
       </div>
+      -->
       <div class="cs-card info-card">
         <h3>账户信息</h3>
         <el-descriptions :column="1" border style="margin-top: 20px">
@@ -106,8 +108,9 @@ const billing = useBillingStore()
 const perm = usePermissionStore()
 // el-tag 的 type 只接受固定枚举值，不能传空字符串
 const identityType = computed(() => (perm.isPlatform ? 'danger' : perm.isEnterpriseAdmin ? 'warning' : 'info'))
-const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
-const changing = ref(false)
+// 已按需求停用：修改密码功能（恢复时取消注释）
+// const pwdForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
+// const changing = ref(false)
 const stats = ref({ totalFiles: 0, totalDirs: 0, recycleCount: 0 })
 
 const quotaPercent = computed(() => billing.totalBytes > 0 ? Math.min(100, Math.round(billing.quota.usedBytes / billing.totalBytes * 100)) : 0)
@@ -135,20 +138,20 @@ onMounted(() => {
   }).catch(() => {})
 })
 
-async function handleChangePassword() {
-  if (!pwdForm.value.oldPassword || !pwdForm.value.newPassword) { ElMessage.error('请填写当前密码和新密码'); return }
-  if (pwdForm.value.newPassword !== pwdForm.value.confirmPassword) { ElMessage.error('两次密码输入不一致'); return }
-  changing.value = true
-  try {
-    await authApi.changePassword({ oldPassword: pwdForm.value.oldPassword, newPassword: pwdForm.value.newPassword })
-    ElMessage.success('密码修改成功')
-    pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
-  } catch (e) {
-    // 错误提示由拦截器统一弹出
-  } finally {
-    changing.value = false
-  }
-}
+// async function handleChangePassword() {
+//   if (!pwdForm.value.oldPassword || !pwdForm.value.newPassword) { ElMessage.error('请填写当前密码和新密码'); return }
+//   if (pwdForm.value.newPassword !== pwdForm.value.confirmPassword) { ElMessage.error('两次密码输入不一致'); return }
+//   changing.value = true
+//   try {
+//     await authApi.changePassword({ oldPassword: pwdForm.value.oldPassword, newPassword: pwdForm.value.newPassword })
+//     ElMessage.success('密码修改成功')
+//     pwdForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+//   } catch (e) {
+//     // 错误提示由拦截器统一弹出
+//   } finally {
+//     changing.value = false
+//   }
+// }
 </script>
 
 <style scoped>

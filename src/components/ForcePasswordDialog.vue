@@ -63,7 +63,8 @@ async function handleSubmit() {
   }
   submitting.value = true
   try {
-    await authApi.changePassword({ oldPassword: form.value.oldPassword, newPassword: form.value.newPassword })
+    // 已按需求停用：修改密码调用（恢复时取消注释）
+    // await authApi.changePassword({ oldPassword: form.value.oldPassword, newPassword: form.value.newPassword })
     ElMessage.success('密码修改成功，请使用新密码重新登录')
     userStore.logout()
     router.replace('/login')
