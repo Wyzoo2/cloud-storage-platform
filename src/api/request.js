@@ -18,12 +18,20 @@ const CLEAR_KEYS = ['cs-token', 'cs-refresh-token', 'cs-user-id', 'cs-username',
 let refreshing = false
 
 /**
- * 错误码矩阵（接口文档 v1.1 §5.1）
+ * 错误码矩阵（接口文档 §五）
  *   40001 未登录/令牌无效 → 直接去登录
  *   40103 登录态已不可用（过期 / 成员停用 / 企业停用）→ 先刷新，失败再去登录
  *   40301 已登录但缺权限点 → 提示 + 刷新一次权限上下文（权限是实时生效的）
+ *   40101 用户名或密码错误（message 带剩余次数）/ 42301 账号已锁定（带剩余分钟）/
+ *   42902 登录过于频繁（带剩余秒数）→ 原样提示，**不刷新令牌、不跳登录页**
  *   其余（409xx / 42101 / 50000 …）→ 原样展示后端 message，不按 code 猜语义
  */
+const LOGIN_ERRORS = {
+  40101: '用户名或密码错误',
+  42301: '账号已锁定，请稍后再试',
+  42902: '登录过于频繁，请稍后再试'
+}
+
 function fail(message, silent) {
   const msg = message || '请求失败'
   if (!silent) ElMessage.error(msg)
@@ -78,6 +86,9 @@ request.interceptors.response.use(
     const silent = !!response.config?.silent
     if (code === 0) return body.data
 
+    // 登录类错误：只提示，不刷新令牌、不跳登录（否则会把"密码错误"变成"登录已过期"）
+    if (LOGIN_ERRORS[code]) return fail(message || LOGIN_ERRORS[code], silent)
+
     if (code === 40103) return refreshAndReplay(response.config)
     if (code === 40001) {
       redirectToLogin(message || '请先登录')
@@ -102,6 +113,10 @@ request.interceptors.response.use(
     const bodyCode = error.response?.data?.code
     const silent = !!error.config?.silent
 
+    // 登录类错误可能以 HTTP 401 返回，必须排在下面的 401 分支之前
+    if (LOGIN_ERRORS[bodyCode]) {
+      return fail(error.response?.data?.message || LOGIN_ERRORS[bodyCode], silent)
+    }
     if (bodyCode === 40001) {
       redirectToLogin(error.response?.data?.message || '请先登录')
       return Promise.reject(error)
