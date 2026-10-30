@@ -189,6 +189,15 @@ export const userApi = {
 
 
 // ===== 平台运维 =====
+// ===== 企业资源池（企业内可用；个人域账号会返回 40000）=====
+export const enterpriseApi = {
+  // { enterpriseId, totalBytes, allocatedBytes, usedBytes, availableBytes, overAllocated, nextExpireAt }
+  pool: () => request.get('/enterprise/pool'),
+  // { total, list: [{ localUserId, displayName, allocatedBytes, usedBytes, enterpriseRole }] }
+  allocations: () => request.get('/enterprise/allocations'),
+  // 设为语义：bytes 为目标额度，0 = 收回；返回 { localUserId, allocatedBytes, pool }
+  setAllocation: (localUserId, bytes) => request.put(`/enterprise/allocations/${localUserId}`, { bytes })
+}
 export const platformApi = {
   // { status?, page, size } → { list: [{ id, code, name, status, ownerUserId, expireAt, createdAt }], total }
   enterprises: params => request.get('/admin/enterprises', { params })

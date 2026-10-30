@@ -48,6 +48,7 @@ export const ADMIN_MENUS = [
   // ===== 仅企业管理员（企业管理）=====
   { path: '/admin/depts', title: '部门管理', icon: 'OfficeBuilding', perm: 'org.dept.read', scope: 'enterprise' },
   { path: '/admin/members', title: '部门成员管理', icon: 'User', perm: 'org.member.read', scope: 'enterprise' },
+  { path: '/admin/resources', title: '企业资源', icon: 'Coin', perm: 'org.member.read', scope: 'enterprise' },
   { path: '/admin/roles', title: '角色管理', icon: 'Key', perm: 'role.read', scope: 'enterprise' },
 
   // ===== 审计日志置底 =====

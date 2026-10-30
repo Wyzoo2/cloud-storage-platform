@@ -33,6 +33,8 @@ const routes = [
       { path: 'depts', name: 'DeptManagement', component: () => import('@/views/admin/DeptManagement.vue'), meta: { title: '部门管理', perm: 'org.dept.read', scope: 'enterprise' } },
       // 部门成员管理（成员列表 + 角色/数据权限分配）
       { path: 'members', name: 'MemberManagement', component: () => import('@/views/admin/MemberManagement.vue'), meta: { title: '部门成员管理', perm: 'org.member.read', scope: 'enterprise' } },
+      { path: 'resources', name: 'EnterpriseResources', component: () => import('@/views/admin/EnterpriseResources.vue'), meta: { title: '企业资源', perm: 'org.member.read', scope: 'enterprise' } },
+
       { path: 'roles', name: 'RoleManagement', component: () => import('@/views/admin/RoleManagement.vue'), meta: { title: '角色管理', perm: 'role.read', scope: 'enterprise' } },
       { path: 'logs', name: 'AuditLog', component: () => import('@/views/admin/AuditLog.vue'), meta: { title: '审计日志', perm: 'admin.audit.read', scope: 'both' } },
       { path: 'billing/config', name: 'BillingConfig', component: () => import('@/views/admin/BillingConfig.vue'), meta: { title: '计费配置', perm: 'admin.billing.read', scope: 'platform' } },

@@ -21,6 +21,9 @@
             <div class="qbar-seg qbar-free" :style="{ width: freeSegPct + '%' }">
               <div class="qbar-fill qbar-free-fill" :style="{ width: freeUsedPct + '%' }"></div>
             </div>
+            <div class="qbar-seg qbar-ent" :style="{ width: entSegPct + '%' }">
+              <div class="qbar-fill qbar-ent-fill" :style="{ width: entUsedPct + '%' }"></div>
+            </div>
             <div class="qbar-seg qbar-extra" :style="{ width: extraSegPct + '%' }">
               <div class="qbar-fill qbar-extra-fill" :style="{ width: extraUsedPct + '%' }"></div>
             </div>
@@ -110,12 +113,23 @@ const isCollapsed = computed(() => !isMobile.value && appStore.sidebarCollapsed)
 const quotaTotal = computed(() => billingStore.totalBytes || userStore.quota.total)
 const quotaUsed = computed(() => billingStore.totalBytes ? billingStore.quota.usedBytes : userStore.quota.used)
 // 侧边栏额度条分段：蓝色=免费额度，绿色=增值额度；优先消耗免费额度
-const freeBytes = computed(() => billingStore.totalBytes > 0 ? (billingStore.quota.freeBytes || 0) : quotaTotal.value)
+const freeBytes = computed(() => billingStore.totalBytes > 0 ? (billingStore.quota.personalBytes ?? billingStore.quota.freeBytes ?? 0) : quotaTotal.value)
+const entBytes = computed(() => billingStore.quota.enterpriseBytes || 0)
 const extraBytes = computed(() => billingStore.totalBytes > 0 ? (billingStore.quota.extraBytes || 0) : 0)
 const freeSegPct = computed(() => quotaTotal.value > 0 ? (freeBytes.value / quotaTotal.value) * 100 : 0)
+const entSegPct = computed(() => quotaTotal.value > 0 ? (entBytes.value / quotaTotal.value) * 100 : 0)
 const extraSegPct = computed(() => quotaTotal.value > 0 ? (extraBytes.value / quotaTotal.value) * 100 : 0)
 const freeUsedPct = computed(() => freeBytes.value > 0 ? (Math.min(quotaUsed.value, freeBytes.value) / freeBytes.value) * 100 : 0)
-const extraUsedPct = computed(() => extraBytes.value > 0 ? Math.min(100, (Math.max(0, quotaUsed.value - freeBytes.value) / extraBytes.value) * 100) : 0)
+const entUsedPct = computed(() => {
+  if (entBytes.value <= 0) return 0
+  const rest = Math.max(0, quotaUsed.value - freeBytes.value)
+  return Math.min(100, (Math.min(rest, entBytes.value) / entBytes.value) * 100)
+})
+const extraUsedPct = computed(() => {
+  if (extraBytes.value <= 0) return 0
+  const rest = Math.max(0, quotaUsed.value - freeBytes.value - entBytes.value)
+  return Math.min(100, (rest / extraBytes.value) * 100)
+})
 // 侧边栏额度文案：有增额时显示「免费 + 增值」，无增额时只显示总额度
 const quotaTotalText = computed(() => extraBytes.value > 0 ? `${formatSize(freeBytes.value)} + ${formatSize(extraBytes.value)}` : formatSize(quotaTotal.value))
 
@@ -196,9 +210,11 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 .quota-bar { display: flex; gap: 2px; height: 6px; border-radius: 4px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
 .qbar-seg { position: relative; height: 100%; overflow: hidden; }
 .qbar-free { background: rgba(59, 130, 246, 0.3); }
+.qbar-ent { background: rgba(99, 102, 241, 0.3); }
 .qbar-extra { background: rgba(34, 197, 94, 0.3); }
 .qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
 .qbar-free-fill { background: #60a5fa; }
+.qbar-ent-fill { background: #818cf8; }
 .qbar-extra-fill { background: #4ade80; }
 .layout-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .header { height: var(--cs-header-height); background: var(--cs-header-bg); border-bottom: 1px solid var(--cs-header-border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }

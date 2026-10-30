@@ -8,7 +8,8 @@ export const useBillingStore = defineStore('billing', () => {
   const config = ref({ freeBytes: 0, pricePerGbMonthCents: 100 })
 
   // 当前额度：免费 / 增量 / 增量到期 / 已用 / 是否超额冻结
-  const quota = ref({ freeBytes: 0, extraBytes: 0, extraExpireAt: null, usedBytes: 0, uploadBlocked: false })
+  // 三段额度：个人免费 / 个人增量 / 企业分配（后端 /billing/quota 已拆开返回）
+  const quota = ref({ personalBytes: 0, freeBytes: 0, extraBytes: 0, enterpriseBytes: 0, extraExpireAt: null, usedBytes: 0, uploadBlocked: false })
 
   // 我的增额申请列表
   const requests = ref([])
@@ -17,7 +18,12 @@ export const useBillingStore = defineStore('billing', () => {
   const loading = ref(false)
 
   // 可用总额度 = 免费 + 增量
-  const totalBytes = computed(() => (quota.value.freeBytes || 0) + (quota.value.extraBytes || 0))
+  // 可用合计 = 个人免费 + 个人增量 + 企业分配（freeBytes 是 personalBytes 的兼容别名）
+  const totalBytes = computed(() =>
+    (quota.value.personalBytes ?? quota.value.freeBytes ?? 0) +
+    (quota.value.extraBytes || 0) +
+    (quota.value.enterpriseBytes || 0)
+  )
 
   // 缺权限点时不发请求（避免整页弹「缺少权限：xxx」），由页面按需降级
   const allowed = code => usePermissionStore().can(code)

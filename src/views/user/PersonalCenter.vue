@@ -26,24 +26,32 @@
             <div class="qbar-seg qbar-free" :style="{ width: freeSegPct + '%' }">
               <div class="qbar-fill qbar-free-fill" :style="{ width: freeUsedPct + '%' }"></div>
             </div>
+            <div class="qbar-seg qbar-ent" :style="{ width: entSegPct + '%' }">
+              <div class="qbar-fill qbar-ent-fill" :style="{ width: entUsedPct + '%' }"></div>
+            </div>
             <div class="qbar-seg qbar-extra" :style="{ width: extraSegPct + '%' }">
               <div class="qbar-fill qbar-extra-fill" :style="{ width: extraUsedPct + '%' }"></div>
             </div>
           </div>
           <div class="quota-detail">
-            <span class="qd-item"><i class="qdot qdot-free"></i>免费额度 {{ formatSize(billing.quota.freeBytes) }}</span>
-            <span class="qd-item"><i class="qdot qdot-extra"></i>增值额度 {{ formatSize(billing.quota.extraBytes) }}</span>
+            <span class="qd-item"><i class="qdot qdot-free"></i>个人免费 {{ formatSize(personalBytes) }}</span>
+            <span v-if="enterpriseBytes > 0" class="qd-item"><i class="qdot qdot-ent"></i>企业分配 {{ formatSize(enterpriseBytes) }}</span>
+            <span class="qd-item"><i class="qdot qdot-extra"></i>个人增量 {{ formatSize(extraBytes) }}</span>
           </div>
         </div>
         <div class="quota-breakdown">
           <div class="qseg">
-            <div class="qseg-label">免费额度</div>
+            <div class="qseg-label">个人免费</div>
             <div class="qseg-val">{{ formatSize(billing.quota.freeBytes) }}</div>
           </div>
           <div class="qseg">
-            <div class="qseg-label">增量额度</div>
+            <div class="qseg-label">个人增量</div>
             <div class="qseg-val">{{ formatSize(billing.quota.extraBytes) }}</div>
             <div class="qseg-sub" v-if="billing.quota.extraExpireAt">到期 {{ formatDate(billing.quota.extraExpireAt) }}</div>
+          </div>
+          <div class="qseg" v-if="enterpriseBytes > 0">
+            <div class="qseg-label">企业分配</div>
+            <div class="qseg-val">{{ formatSize(enterpriseBytes) }}</div>
           </div>
           <div class="qseg">
             <div class="qseg-label">已用空间</div>
@@ -117,15 +125,28 @@ const quotaPercent = computed(() => billing.totalBytes > 0 ? Math.min(100, Math.
 
 // —— 额度条分段：蓝色=免费额度，绿色=增值额度；优先消耗免费额度 ——
 const usedBytes = computed(() => billing.quota.usedBytes || 0)
-const freeBytes = computed(() => billing.quota.freeBytes || 0)
+// 三段：个人免费 / 企业分配 / 个人增量（后端 /billing/quota 的 personalBytes、enterpriseBytes、extraBytes）
+const personalBytes = computed(() => billing.quota.personalBytes ?? billing.quota.freeBytes ?? 0)
+const enterpriseBytes = computed(() => billing.quota.enterpriseBytes || 0)
 const extraBytes = computed(() => billing.quota.extraBytes || 0)
+const freeBytes = personalBytes
 // 免费段 / 增值段 占总额度的宽度比例
-const freeSegPct = computed(() => billing.totalBytes > 0 ? (freeBytes.value / billing.totalBytes) * 100 : 0)
+const freeSegPct = computed(() => billing.totalBytes > 0 ? (personalBytes.value / billing.totalBytes) * 100 : 0)
+const entSegPct = computed(() => billing.totalBytes > 0 ? (enterpriseBytes.value / billing.totalBytes) * 100 : 0)
 const extraSegPct = computed(() => billing.totalBytes > 0 ? (extraBytes.value / billing.totalBytes) * 100 : 0)
 // 免费额度内已用比例（先用免费）
-const freeUsedPct = computed(() => freeBytes.value > 0 ? (Math.min(usedBytes.value, freeBytes.value) / freeBytes.value) * 100 : 0)
+const freeUsedPct = computed(() => personalBytes.value > 0 ? (Math.min(usedBytes.value, personalBytes.value) / personalBytes.value) * 100 : 0)
 // 增值额度内已用比例（免费用完后才用增值）
-const extraUsedPct = computed(() => extraBytes.value > 0 ? Math.min(100, (Math.max(0, usedBytes.value - freeBytes.value) / extraBytes.value) * 100) : 0)
+const entUsedPct = computed(() => {
+  if (enterpriseBytes.value <= 0) return 0
+  const rest = Math.max(0, usedBytes.value - personalBytes.value)
+  return Math.min(100, (Math.min(rest, enterpriseBytes.value) / enterpriseBytes.value) * 100)
+})
+const extraUsedPct = computed(() => {
+  if (extraBytes.value <= 0) return 0
+  const rest = Math.max(0, usedBytes.value - personalBytes.value - enterpriseBytes.value)
+  return Math.min(100, (rest / extraBytes.value) * 100)
+})
 
 onMounted(() => {
   // 刷新配额（/auth/profile）
@@ -168,14 +189,17 @@ onMounted(() => {
 .quota-bar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 12px; background: var(--cs-bg-hover); }
 .qbar-seg { position: relative; height: 100%; overflow: hidden; }
 .qbar-free { background: #dbeafe; }
+.qbar-ent { background: #e0e7ff; }
 .qbar-extra { background: #d1fae5; }
 .qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
 .qbar-free-fill { background: #3b82f6; }
+.qbar-ent-fill { background: #6366f1; }
 .qbar-extra-fill { background: #22c55e; }
 .quota-detail { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--cs-text-secondary); margin-bottom: 16px; }
 .qd-item { display: inline-flex; align-items: center; gap: 6px; }
 .qdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 .qdot-free { background: #3b82f6; }
+.qdot-ent { background: #6366f1; }
 .qdot-extra { background: #22c55e; }
 .quota-breakdown { display: flex; gap: 32px; flex-wrap: wrap; padding: 16px; background: var(--cs-bg-hover); border-radius: 6px; margin-bottom: 16px; }
 .qseg { min-width: 100px; }
