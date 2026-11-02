@@ -37,13 +37,13 @@
             <el-tag size="small" :type="statusType(row.status)" effect="plain">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="成员数" width="100" align="right">
+        <el-table-column label="成员数" width="200">
           <template #default="{ row }">{{ row.memberCount == null ? '--' : row.memberCount }}</template>
         </el-table-column>
-        <el-table-column label="到期时间" width="180">
+        <!-- <el-table-column label="到期时间" width="180">
           <template #default="{ row }">{{ row.expireAt ? formatDateNo8(row.expireAt) : '--' }}</template>
-        </el-table-column>
-        <el-table-column label="创建时间" width="180">
+        </el-table-column> -->
+        <el-table-column label="创建时间" width="280">
           <template #default="{ row }">{{ row.createdAt ? formatDateNo8(row.createdAt) : '--' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right" align="center">
