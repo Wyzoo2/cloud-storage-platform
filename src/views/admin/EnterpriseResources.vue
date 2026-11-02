@@ -1,103 +1,155 @@
 <template>
   <div class="cs-page">
-    <div class="breadcrumb-bar">
-      <div class="page-head-left">
-        <h2 class="page-title"><el-icon><Coin /></el-icon>企业资源</h2>
-        <span class="page-sub">企业购买的空间集中管理，按成员分配</span>
-      </div>
+    <div class="page-head">
+      <h2 class="page-title"><el-icon><Coin /></el-icon>{{ isManager ? '企业资源' : '我的企业空间' }}<el-button link type="primary" @click="router.push('/packages')" style="padding-top: 10px;font-size: 14px;">前往套餐增值</el-button></h2>
       <el-button link :loading="loading" @click="refreshAll">
         <el-icon><Refresh /></el-icon>刷新
       </el-button>
     </div>
 
-    <!-- 超卖警示 -->
-    <el-alert
-      v-if="pool.overAllocated"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="over-alert"
-      title="企业池已超卖"
-      :description="`本月套餐已到期，当前池 ${formatSize(pool.totalBytes)}，已分配 ${formatSize(pool.allocatedBytes)}，请缩减差额或尽快续费；超卖期间只能下调分配。`"
-    />
+    <div v-if="pool.suspended || pool.overAllocated" class="over-bar">
+      <el-icon class="over-icon"><WarningFilled /></el-icon>
+      <span class="over-text">可分配额度为负（差额 {{ formatSize(Math.abs(pool.availableBytesRaw || 0)) }}），上传/下载/预览已暂停</span>
+      <el-button v-if="isManager" link type="primary" size="small" @click="router.push('/packages')">去续费</el-button>
+    </div>
 
-    <!-- 池概览 -->
-    <div class="pool-row" v-loading="loading">
-      <div class="pool-card">
-        <span class="pool-label">池总量</span>
-        <span class="pool-value">{{ formatSize(pool.totalBytes) }}</span>
+    <div class="cs-card pool-card" v-loading="loading">
+      <div class="pool-head">
+        <span class="pool-title">空间池</span>
+        <span class="pool-pct" :class="{ danger: pool.availableBytesRaw < 0 }">已分配 {{ allocatedPct }}%</span>
       </div>
-      <div class="pool-card">
-        <span class="pool-label">已分配</span>
-        <span class="pool-value">{{ formatSize(pool.allocatedBytes) }}</span>
-      </div>
-      <div class="pool-card">
-        <span class="pool-label">可再分配</span>
-        <span class="pool-value accent">{{ formatSize(pool.availableBytes) }}</span>
-      </div>
-      <div class="pool-card">
-        <span class="pool-label">企业已用</span>
-        <span class="pool-value">{{ formatSize(pool.usedBytes) }}</span>
-      </div>
-      <div class="pool-card">
-        <span class="pool-label">最近到期</span>
-        <span class="pool-value small">{{ pool.nextExpireAt ? formatDate(pool.nextExpireAt) : '--' }}</span>
+      <el-progress
+        :percentage="Math.min(100, allocatedPct)"
+        :stroke-width="8"
+        :show-text="false"
+        :color="pool.availableBytesRaw < 0 ? '#c94a3b' : '#2f6fb5'"
+        class="pool-bar"
+      />
+      <div class="pool-metrics">
+        <div class="metric">
+          <span class="metric-label">池总量</span>
+          <span class="metric-value">{{ formatSize(pool.totalBytes) }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">已分配</span>
+          <span class="metric-value">{{ formatSize(pool.allocatedBytes) }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">可再分配</span>
+          <span class="metric-value" :class="pool.availableBytesRaw < 0 ? 'danger' : 'accent'">
+            {{ formatSize(pool.availableBytesRaw ?? pool.availableBytes) }}
+          </span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">成员已用</span>
+          <span class="metric-value">{{ formatSize(pool.usedBytes) }}</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">最近到期</span>
+          <span class="metric-value small">
+            {{ pool.nextExpireAt ? formatDate(pool.nextExpireAt) : '--' }}
+            <el-button v-if="isManager" link type="primary" size="small" class="renew-link" @click="router.push('/packages')">续费</el-button>
+          </span>
+        </div>
       </div>
     </div>
 
-    <!-- 成员分配 -->
     <div class="cs-card table-card">
       <div class="panel-head">
         <span>成员分配</span>
-        <span class="panel-count">{{ allocations.length }} 位成员</span>
+        <span class="panel-count">{{ allocations.length }}</span>
       </div>
       <el-table :data="allocations" v-loading="loading" style="width: 100%" row-key="localUserId">
-        <el-table-column label="成员" min-width="200">
+        <el-table-column label="成员" min-width="220">
           <template #default="{ row }">
-            <div class="who-text">
+            <div class="who">
               <span class="who-name">{{ row.displayName || ('用户 #' + row.localUserId) }}</span>
-              <span class="who-sub">
-                <el-tag v-if="row.enterpriseRole === 1" size="small" effect="plain" type="warning">企业管理员</el-tag>
-                <span v-else class="muted">普通成员</span>
-              </span>
+              <el-tag v-if="row.enterpriseRole === 1" size="small" effect="plain" type="warning">企业管理员</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="已分配" width="140" align="right">
+        <el-table-column label="已分配" width="130" align="right">
           <template #default="{ row }">
             <span :class="{ muted: !row.allocatedBytes }">{{ row.allocatedBytes ? formatSize(row.allocatedBytes) : '未分配' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="已使用" width="140" align="right">
-          <template #default="{ row }">{{ formatSize(row.usedBytes || 0) }}</template>
-        </el-table-column>
-        <el-table-column label="占用比" min-width="180">
+        <el-table-column label="使用情况" min-width="240">
           <template #default="{ row }">
-            <el-progress
-              v-if="row.allocatedBytes > 0"
-              :percentage="Math.min(100, Math.round((row.usedBytes || 0) / row.allocatedBytes * 100))"
-              :stroke-width="6"
-              :show-text="false"
-              :color="usageColor(row)"
-            />
-            <span v-else class="muted">--</span>
+            <div v-if="row.allocatedBytes > 0" class="usage">
+              <el-progress
+                :percentage="Math.min(100, usagePct(row))"
+                :stroke-width="6"
+                :show-text="false"
+                :color="usageColor(row)"
+                class="usage-bar"
+              />
+              <span class="usage-text">{{ formatSize(row.usedBytes || 0) }} · {{ usagePct(row) }}%</span>
+            </div>
+            <span v-else class="muted">{{ formatSize(row.usedBytes || 0) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" align="right">
+        <el-table-column label="操作" width="200" align="center">
           <template #default="{ row }">
-            <el-button v-perm="'org.member.manage'" link type="primary" size="small" @click="openAllocate(row)">
-              调整额度
-            </el-button>
+            <el-button v-perm="'org.member.manage'" link type="primary" size="small" @click="openAllocate(row)">调整额度</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <div class="table-foot">
-        <span class="muted">未激活（从未登录）的成员不会出现在这里，需要对方先登录一次。</span>
-      </div>
     </div>
 
-    <!-- 调整额度 -->
-    <el-dialog v-model="dialog" :title="`调整额度 · ${current?.displayName || ''}`" width="440px" align-center destroy-on-close>
+    <div v-if="isManager" class="cs-card table-card">
+      <div class="panel-head">
+        <span>套餐记录</span>
+        <div class="sub-summary">
+          <span>有效 <b>{{ activeSubCount }}</b> 笔</span>
+          <template v-if="activeSubQuota > 0">
+            <span class="sep">|</span>
+            <span>总容量 <b>{{ fmtQuota(activeSubQuota).num }}{{ fmtQuota(activeSubQuota).unit }}</b></span>
+          </template>
+          <template v-if="nextExpireAt">
+            <span class="sep">|</span>
+            <span>最近到期 <b>{{ formatDate(nextExpireAt) }}</b></span>
+          </template>
+        </div>
+      </div>
+      <el-table v-if="subscriptions.length" :data="subscriptions" size="small" style="width: 100%" row-key="orderItemId" :row-class-name="expiringRowClass">
+        <el-table-column label="套餐" min-width="180">
+          <template #default="{ row }">
+            <span :class="{ 'row-muted': subEnded(row) }">{{ row.skuName || row.skuId || '--' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="容量" width="110" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'row-muted': subEnded(row) }">{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).num }}{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).unit }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="isExpiring(row)" size="small" type="danger" effect="plain">即将到期</el-tag>
+            <el-tag v-else size="small" :type="subStateOf(row).type" effect="plain">{{ subStateOf(row).text }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="到期" min-width="220">
+          <template #default="{ row }">
+            <span class="sub-date">
+              {{ row.expireAt ? formatDate(row.expireAt) : '--' }}
+              <span v-if="!subEnded(row)" class="remain" :class="{ soon: isExpiring(row) }">· {{ formatRemain(row.expireAt) }}</span>
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" align="center">
+          <template #default="{ row }">
+            <el-tooltip :disabled="canRenew(row)" :content="renewTip(row)" placement="top">
+              <span>
+                <el-button link type="primary" size="small" :disabled="!canRenew(row)" :loading="renewing === row.orderItemId" @click="renew(row)">续费</el-button>
+              </span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-else class="sub-empty">暂无套餐</div>
+    </div>
+
+    <el-dialog v-model="dialog" :title="`调整额度 · ${current?.displayName || ''}`" width="420px" align-center destroy-on-close>
       <div class="alloc-body">
         <div class="alloc-row">
           <span class="alloc-label">当前分配</span>
@@ -109,52 +161,190 @@
         </div>
         <div class="alloc-row">
           <span class="alloc-label">可再分配</span>
-          <span>{{ formatSize(pool.availableBytes) }}</span>
+          <span :class="pool.availableBytesRaw < 0 ? 'danger' : ''">{{ formatSize(pool.availableBytesRaw ?? pool.availableBytes) }}</span>
         </div>
         <el-form label-width="80px" label-position="left" class="alloc-form">
           <el-form-item label="目标额度">
-            <el-input-number v-model="gb" :min="0" :max="maxGb" :step="1" :precision="2" controls-position="right" style="width: 100%" />
+            <el-input-number v-model="gb" :min="0" :max="Math.max(0, maxGb)" :step="1" :precision="2" controls-position="right" style="width: 100%" />
             <span class="unit">GB</span>
           </el-form-item>
         </el-form>
-        <div class="alloc-hint muted">
-          直接填写最终额度（不是增量）；填 0 表示收回该成员的企业额度。
-          <template v-if="maxGb <= 0">当前池已无剩余，无法上调。</template>
-        </div>
       </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button :disabled="!current?.allocatedBytes" @click="revoke">收回额度</el-button>
+          <el-button :disabled="!current?.allocatedBytes" @click="revoke">收回</el-button>
           <el-button @click="dialog = false">取消</el-button>
           <el-button type="primary" :loading="saving" @click="save">保存</el-button>
         </div>
       </template>
     </el-dialog>
-  </div>
-</template>
 
-<script setup>
+    <OrderConfirmDialog
+      v-model="confirmVisible"
+      kind="renew"
+      :quantity="confirmQty"
+      :item="confirmItem"
+      :wallet-known="billing.walletState === 'ok'"
+      :balance-cents="Number(billing.wallet.balanceCents || 0)"
+      :balance-yuan="billing.wallet.balanceYuan"
+      :frozen="!!billing.wallet.frozen"
+      @confirm="onConfirmed"
+    />
+
+    <ProvisionDialog
+      v-model="provVisible"
+      :title="provTitle"
+      :state="provState"
+      :percent="provPercent"
+      :step-text="provStep"
+      :detail="provDetail"
+    />
+  </div>
+</template><script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Coin, Refresh } from '@element-plus/icons-vue'
+import { Coin, Refresh, WarningFilled } from '@element-plus/icons-vue'
 import { enterpriseApi } from '@/api'
-import { formatSize, formatDate } from '@/utils/file'
+import OrderConfirmDialog from '@/components/OrderConfirmDialog.vue'
+import ProvisionDialog from '@/components/ProvisionDialog.vue'
+import { pollProvision } from '@/utils/provision'
+import { useBillingStore } from '@/stores/billing'
+import { usePermissionStore } from '@/stores/permission'
+import { useRouter } from 'vue-router'
+import { formatSize, formatDate, formatRemain, remainMs } from '@/utils/file'
 
 const GB = 1024 ** 3
+const perm = usePermissionStore()
+const billing = useBillingStore()
+const router = useRouter()
+
+// 企业管理员/平台管理员可管理分配；普通成员只能看自己那一行（后端也按身份裁剪）
+const isManager = computed(() => perm.can('org.member.manage'))
 
 const loading = ref(false)
 const saving = ref(false)
-const pool = ref({ totalBytes: 0, allocatedBytes: 0, usedBytes: 0, availableBytes: 0, overAllocated: false, nextExpireAt: null })
+const pool = ref({ totalBytes: 0, allocatedBytes: 0, usedBytes: 0, availableBytes: 0, availableBytesRaw: 0, overAllocated: false, suspended: false, nextExpireAt: null })
 const allocations = ref([])
+const subscriptions = ref([])
+const renewing = ref(0)
 const dialog = ref(false)
 const current = ref(null)
 const gb = ref(0)
+
+/* ---------------- 下单确认弹窗（显示花费与余额） ---------------- */
+const confirmVisible = ref(false)
+const confirmItem = ref({})
+const confirmQty = ref(1)
+const pendingOrder = ref(null)
+
+function askConfirm(title, item, payload, opts = {}) {
+  confirmItem.value = item
+  confirmQty.value = Number(opts.quantity || 1)
+  pendingOrder.value = payload
+  confirmVisible.value = true
+}
+
+async function onConfirmed() {
+  confirmVisible.value = false
+  const payload = pendingOrder.value
+  if (!payload) return
+  pendingOrder.value = null
+  await runRenew(payload)
+}
+
+/* ---------------- 开通进度弹窗：开通结束前不可关闭 ---------------- */
+const provVisible = ref(false)
+const provTitle = ref('续费')
+const provState = ref('running')
+const provPercent = ref(0)
+const provStep = ref('')
+const provDetail = ref('')
+
+function openProvision(title) {
+  provTitle.value = title
+  provState.value = 'running'
+  provPercent.value = 0
+  provStep.value = ''
+  provDetail.value = ''
+  provVisible.value = true
+}
+
+function setProvision(state, percent, step, detail = '') {
+  provState.value = state
+  provPercent.value = percent
+  provStep.value = step
+  provDetail.value = detail
+}
 
 // 本成员最终可达到的上限 = 已有分配 + 池剩余（避免前端先查再加算错）
 const maxGb = computed(() => {
   const cap = Number(current.value?.allocatedBytes || 0) + Number(pool.value.availableBytes || 0)
   return Math.floor(cap / GB)
 })
+
+// 已回收的套餐不可续费（需重新购买）
+function canRenew(row) {
+  return row?.status !== 'reclaimed'
+}
+
+function renewTip(row) {
+  return row?.status === 'reclaimed' ? '该套餐已回收，无法续费，请重新购买' : ''
+}
+
+// 7 天内到期（含按小时显示）→ 整行淡红底 + 状态「即将到期」
+const EXPIRING_MS = 7 * 24 * 3600 * 1000
+function isExpiring(row) {
+  if (subEnded(row)) return false
+  const ms = remainMs(row.expireAt)
+  return ms !== null && ms > 0 && ms <= EXPIRING_MS
+}
+
+function expiringRowClass({ row }) {
+  return isExpiring(row) ? 'row-expiring' : ''
+}
+
+// 套餐是否已结束（已回收 / 已到期）
+function subEnded(row) {
+  if (row.status === 'reclaimed') return true
+  if (row.expired != null) return !!row.expired
+  return row.expireAt ? new Date(row.expireAt).getTime() < Date.now() : false
+}
+
+// 有效期内的套餐数 / 总容量 / 最近到期
+const activeSubCount = computed(() => subscriptions.value.filter(s => !subEnded(s)).length)
+const activeSubQuota = computed(() =>
+  subscriptions.value.filter(s => !subEnded(s)).reduce((sum, s) => sum + Number(s.totalQuotaGb ?? s.unitQuotaGb ?? 0), 0)
+)
+const nextExpireAt = computed(() => {
+  const list = subscriptions.value.filter(s => !subEnded(s)).map(s => s.expireAt).filter(Boolean).sort()
+  return list[0] || ''
+})
+
+// GB 超过 1024 进位成 TB
+function fmtQuota(gb) {
+  const n = Number(gb || 0)
+  if (!n) return { num: '--', unit: '' }
+  return n >= 1024 ? { num: String(+(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)), unit: 'TB' } : { num: String(n), unit: 'GB' }
+}
+
+// 套餐状态：active 有效 / reclaimed 已回收；expireAt 过了但还没回收，也提示已到期
+function subStateOf(row) {
+  if (row.status === 'reclaimed') return { text: '已回收', type: 'info' }
+  const isExpired = row.expired != null ? !!row.expired : (row.expireAt ? new Date(row.expireAt).getTime() < Date.now() : false)
+  if (isExpired) return { text: '已到期', type: 'warning' }
+  return { text: '有效', type: 'success' }
+}
+
+// 池已分配占比（进度条用）
+const allocatedPct = computed(() => {
+  const total = Number(pool.value.totalBytes || 0)
+  return total > 0 ? Math.round(Number(pool.value.allocatedBytes || 0) / total * 100) : 0
+})
+
+// 单个成员额度使用率
+function usagePct(row) {
+  return row.allocatedBytes > 0 ? Math.round((row.usedBytes || 0) / row.allocatedBytes * 100) : 0
+}
 
 function usageColor(row) {
   const pct = row.allocatedBytes > 0 ? (row.usedBytes || 0) / row.allocatedBytes * 100 : 0
@@ -180,10 +370,70 @@ async function loadAllocations() {
   }
 }
 
+async function loadSubscriptions() {
+  if (!isManager.value) { subscriptions.value = []; return }
+  try {
+    const res = await enterpriseApi.subscriptions()
+    subscriptions.value = res?.list || []
+  } catch (e) {
+    subscriptions.value = []
+  }
+}
+
+// 续费：先取「买什么 + 价格 + 幂等键」→ 确认弹窗 → 下单 → 开通（结束前弹窗不可关）
+// 续费：先弹确认（价格取订阅行的 totalPriceCents/priceCents），确认后调 /billing/subscriptions/{id}/renew
+// 该接口一步完成（后端已建门户订单并延期），返回 portalOrderId 用于轮询开通结果
+async function renew(row) {
+  // 已回收的套餐后端不再提供续费，前端直接拦住
+  if (row?.status === 'reclaimed') return ElMessage.warning('该套餐已回收，无法续费，请重新购买')
+  if (!billing.walletState || billing.walletState === 'idle') await billing.loadWallet()
+  const quotaGb = row.totalQuotaGb ?? row.unitQuotaGb ?? null
+  const qty = Number(row.quantity || 1)
+  const totalCents = Number(row.totalPriceCents ?? row.priceCents ?? 0)
+  askConfirm(
+    `续费 · ${row.skuName || row.skuId || ''}`,
+    {
+      name: row.skuName || row.skuId,
+      unitQuotaGb: qty > 0 ? Number(quotaGb || 0) / qty : quotaGb,
+      periodDays: row.periodDays,
+      unitPriceCents: qty > 0 ? Math.round(totalCents / qty) : totalCents
+    },
+    { orderItemId: row.orderItemId, quotaGb },
+    { quantity: qty }
+  )
+}
+
+async function runRenew(payload) {
+  renewing.value = payload.orderItemId
+  openProvision(`续费 · ${confirmItem.value?.name || ''}`)
+  setProvision('running', 25, '提交续费…')
+  try {
+    const r = await enterpriseApi.renewSubscription(payload.orderItemId)
+    if (r?.pool) pool.value = r.pool
+    setProvision('running', 60, '开通中…')
+    const orderId = r?.portalOrderId ?? r?.orderId ?? null
+    if (orderId) {
+      const result = await pollProvision(orderId, {
+        onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
+      })
+      if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效')
+      else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
+      else setProvision('done', 100, '续费已完成', '开通状态仍需门户确认，可稍后刷新查看。')
+    } else {
+      setProvision('done', 100, '续费成功，套餐已生效')
+    }
+    await Promise.all([loadPool(), loadSubscriptions(), billing.loadWallet()])
+    await perm.load(true)
+  } catch (e) {
+    setProvision('failed', 100, '续费失败', e?.message || '')
+  } finally {
+    renewing.value = 0
+  }
+}
 async function refreshAll() {
   loading.value = true
   try {
-    await Promise.all([loadPool(), loadAllocations()])
+    await Promise.all([loadPool(), loadAllocations(), loadSubscriptions(), billing.loadWallet()])
   } finally {
     loading.value = false
   }
@@ -204,6 +454,8 @@ async function submit(bytes) {
     ElMessage.success(bytes === 0 ? '已收回该成员的企业额度' : `已分配 ${formatSize(bytes)}`)
     dialog.value = false
     await loadAllocations()
+    // 分配变化可能让企业从「超额」恢复（或进入超额），刷新上下文让全局横幅/按钮立即同步
+    await perm.load(true)
   } catch (e) {
     // 40000（超额/超卖/不属于本企业）由拦截器原样提示
   } finally {
@@ -245,31 +497,52 @@ onMounted(refreshAll)
 </script>
 
 <style scoped>
-.breadcrumb-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-.page-head-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.page-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .2px; color: var(--cs-text-primary); }
-.page-sub { font-size: 12px; color: var(--cs-text-tertiary); }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.page-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 600; color: var(--cs-text-primary); }
 
-.over-alert { margin-bottom: 14px; }
+.over-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px;
+  border: 1px solid #f0c9c2; border-radius: var(--cs-radius-lg); background: #fdf2f0; font-size: 12.5px; color: #a33227; }
+.over-icon { color: var(--cs-danger); font-size: 16px; flex: none; }
+.over-text { flex: 1; min-width: 0; line-height: 1.5; }
 
-.pool-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
-.pool-card { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: var(--cs-radius-lg);
-  background: var(--cs-bg-container); box-shadow: var(--cs-shadow-sm); }
-.pool-label { font-size: 12px; color: var(--cs-text-tertiary); }
-.pool-value { font-size: 19px; font-weight: 700; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
-.pool-value.small { font-size: 14px; font-weight: 500; }
-.pool-value.accent { color: var(--cs-primary); }
+.pool-card { padding: 16px 18px; margin-bottom: 14px; border-radius: var(--cs-radius-lg); box-shadow: var(--cs-shadow-sm); }
+.pool-head { display: flex; align-items: center; justify-content: space-between; }
+.pool-title { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
+.pool-pct { font-size: 12px; color: var(--cs-text-tertiary); font-variant-numeric: tabular-nums; }
+.pool-pct.danger { color: var(--cs-danger); }
+.pool-bar { margin: 12px 0 16px; }
+.pool-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.metric { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.metric-label { font-size: 11.5px; color: var(--cs-text-tertiary); }
+.metric-value { font-size: 16px; font-weight: 700; color: var(--cs-text-primary); font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.metric-value.small { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.metric-value.accent { color: var(--cs-primary); }
+.metric-value.danger, .danger { color: var(--cs-danger); }
+.renew-link { padding: 0; height: auto; }
 
-.table-card { padding: 0; overflow: hidden; border-radius: var(--cs-radius-lg); box-shadow: var(--cs-shadow-sm); }
+.table-card { padding: 0; overflow: hidden; border-radius: var(--cs-radius-lg); box-shadow: var(--cs-shadow-sm); margin-bottom: 14px; }
 .panel-head { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--cs-border-light);
   font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
 .panel-count { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--cs-text-tertiary); }
-.table-foot { padding: 10px 16px; border-top: 1px solid var(--cs-border-light); font-size: 11.5px; }
+.table-card :deep(.el-table th.el-table__cell) { background: var(--cs-bg-page); color: var(--cs-text-tertiary); font-size: 12px; font-weight: 600; }
 
-.who-text { display: flex; flex-direction: column; gap: 3px; }
-.who-name { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
-.who-sub { font-size: 11.5px; }
+.who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.who-name { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .muted { color: var(--cs-text-tertiary); }
+
+.usage { display: flex; flex-direction: column; gap: 4px; }
+.usage-bar { width: 100%; }
+.usage-text { font-size: 11.5px; color: var(--cs-text-tertiary); font-variant-numeric: tabular-nums; }
+.sub-summary { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 11.5px; font-weight: 400; color: var(--cs-text-tertiary); }
+.sub-summary b { color: var(--cs-text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sub-summary .sep { color: var(--cs-text-disabled); }
+.sub-date { font-size: 12px; color: var(--cs-text-tertiary); font-variant-numeric: tabular-nums; }
+.remain { margin-left: 2px; }
+.remain.soon { color: var(--cs-danger); font-weight: 700; }
+.row-muted { color: var(--cs-text-disabled); }
+.section :deep(.row-expiring > td), :deep(.row-expiring > td) { background: rgba(255, 77, 79, .06) !important; }
+.sub-empty { padding: 22px 16px; font-size: 12px; text-align: center; color: var(--cs-text-tertiary); }
 
 .alloc-body { display: flex; flex-direction: column; gap: 8px; }
 .alloc-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--cs-text-primary); }
@@ -277,10 +550,9 @@ onMounted(refreshAll)
 .alloc-form { margin-top: 8px; position: relative; }
 .alloc-form .unit { position: absolute; right: 42px; top: 50%; transform: translateY(-50%);
   font-size: 12px; color: var(--cs-text-tertiary); pointer-events: none; }
-.alloc-hint { font-size: 11.5px; line-height: 1.6; margin-top: 4px; }
 .dialog-footer { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 1180px) {
-  .pool-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pool-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

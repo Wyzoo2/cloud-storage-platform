@@ -40,6 +40,12 @@ export const useBillingStore = defineStore('billing', () => {
   async function loadQuota() {
     if (!allowed('quota.read')) return
     quota.value = await billingApi.getQuota()
+    // 后端在 /billing/quota 里也带 enterpriseSuspended：与上下文不一致就刷一次上下文，
+    // 让超额横幅与上传/下载禁用能及时出现或解除
+    const permNow = usePermissionStore()
+    if (quota.value.enterpriseSuspended != null && !!quota.value.enterpriseSuspended !== permNow.enterpriseSuspended) {
+      permNow.load(true)
+    }
   }
 
   async function loadWallet() {

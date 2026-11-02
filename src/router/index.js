@@ -14,6 +14,8 @@ const routes = [
       { path: 'transfers', name: 'Transfers', component: () => import('@/views/user/Transfers.vue'), meta: { title: '传输任务', perm: 'transfer.read' } },
       { path: 'recycle', name: 'RecycleBin', component: () => import('@/views/user/RecycleBin.vue'), meta: { title: '回收站', perm: 'recycle.read' } },
       { path: 'billing', name: 'BillingIncrease', component: () => import('@/views/user/BillingIncrease.vue'), meta: { title: '增额申请', perm: ['increase.apply', 'increase.read'] } },
+      { path: 'packages', name: 'PackageStore', component: () => import('@/views/user/PackageStore.vue'), meta: { title: '套餐增值' } },
+
       // 个人中心不做权限点限制：所有能登录的人都能看自己的资料/改密码
       { path: 'profile', name: 'PersonalCenter', component: () => import('@/views/user/PersonalCenter.vue'), meta: { title: '个人中心' } }
     ]

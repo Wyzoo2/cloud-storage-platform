@@ -29,7 +29,7 @@
       <div class="toolbar-left">
         <el-input
           v-model="keyword"
-          placeholder="搜索用户名"
+          placeholder="搜索用户ID"
           :prefix-icon="Search"
           clearable
           style="width: 220px"
@@ -39,7 +39,9 @@
           <el-option label="禁用" value="disabled" />
         </el-select>
       </div>
-      <div class="toolbar-right"><el-tag type="info">共 {{ total }} 个账号</el-tag></div>
+      <div class="toolbar-right">
+        <el-tag type="info">共 {{ total }} 个账号</el-tag>
+      </div>
     </div>
 
     <div v-if="!loading && !rows.length" class="cs-card empty-card">
@@ -99,7 +101,7 @@
         <el-table-column label="最近登录" width="170">
           <template #default="{ row }">{{ row.lastLoginAt ? formatDate(row.lastLoginAt) : '--' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
               <el-button v-perm="'admin.user.quota'" link type="primary" size="small" @click="openQuota(row)">分配额度</el-button>
@@ -156,6 +158,9 @@ import { Search } from '@element-plus/icons-vue'
 import { adminApi } from '@/api'
 import { formatSize, formatDate } from '@/utils/file'
 import { displayName, accountOf } from '@/utils/user'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const rows = ref([])
 const total = ref(0)
@@ -312,6 +317,7 @@ onMounted(() => {
 .stat-value { font-size: 19px; font-weight: 700; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
 
 .toolbar-left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
 .table-card { overflow-x: auto; }
 .empty-card { padding: 24px; }
 
@@ -326,9 +332,9 @@ onMounted(() => {
 .quota-pct { color: var(--cs-text-secondary); font-variant-numeric: tabular-nums; }
 .quota-pct.over { color: var(--cs-danger); font-weight: 600; }
 
-.op-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; white-space: nowrap; }
+.op-actions { display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap; }
 .op-actions .el-button { margin-left: 0; }
-.pagination-bar { display: flex; justify-content: flex-end; margin-top: 18px; }
+.pagination-bar { display: flex; justify-content: center; margin-top: 18px; }
 
 .quota-now { display: flex; gap: 18px; font-size: 13px; color: var(--cs-text-secondary); margin-bottom: 14px; }
 .quota-now b { color: var(--cs-text-primary); font-weight: 600; }

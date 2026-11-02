@@ -46,6 +46,11 @@
         <el-table-column label="创建时间" width="180">
           <template #default="{ row }">{{ row.createdAt ? formatDateNo8(row.createdAt) : '--' }}</template>
         </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openAccounts(row)">查看账号</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
@@ -61,12 +66,60 @@
         @size-change="handleSizeChange"
       />
     </div>
+    <!-- 企业账号（GET /admin/enterprises/{id}/accounts，offset/limit） -->
+    <el-drawer v-model="accountsDrawer" :title="`企业账号 · ${currentEnt.name || ''}`" size="560px" destroy-on-close>
+      <div class="acc-body" v-loading="accountsLoading">
+        <div v-if="accountsError" class="acc-error">{{ accountsError }}</div>
+        <el-table v-else :data="accounts" size="small" style="width: 100%" row-key="portalUserId">
+          <el-table-column label="账号" min-width="150">
+            <template #default="{ row }">
+              <div class="acc-user">
+                <span class="acc-name">{{ row.username || row.portalUserId }}</span>
+                <span v-if="row.isOwner" class="acc-owner">创建者</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="手机" width="130">
+            <template #default="{ row }">{{ row.phone || '--' }}</template>
+          </el-table-column>
+          <el-table-column label="企业角色" width="110">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.enterpriseRole === 1 ? 'warning' : 'info'" effect="plain">
+                {{ row.enterpriseRole === 1 ? '企业管理员' : '成员' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.status === 0 ? 'success' : 'danger'" effect="plain">
+                {{ row.status === 0 ? '正常' : '停用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <div class="acc-foot">
+          <span class="acc-total">共 {{ accountsTotal }} 个账号</span>
+          <el-pagination
+            v-model:current-page="accountsPage"
+            :page-size="accountsSize"
+            :total="accountsTotal"
+            layout="prev, pager, next"
+            small
+            background
+            @current-change="loadAccounts"
+          />
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { rbacSource } from '@/api/rbacSource'
+import { platformApi } from '@/api'
 import { formatDateNo8 } from '@/utils/file'
 
 const rows = ref([])
@@ -112,6 +165,49 @@ function handleSizeChange() {
 
 watch(statusFilter, () => { page.value = 1; load() })
 
+/* ---------------- 企业账号抽屉 ---------------- */
+const accountsDrawer = ref(false)
+const accountsLoading = ref(false)
+const accountsError = ref('')
+const accounts = ref([])
+const accountsTotal = ref(0)
+const accountsPage = ref(1)
+const accountsSize = ref(20)
+const currentEnt = ref({})
+
+function openAccounts(row) {
+  currentEnt.value = row
+  accounts.value = []
+  accountsTotal.value = 0
+  accountsPage.value = 1
+  accountsError.value = ''
+  accountsDrawer.value = true
+  loadAccounts()
+}
+
+async function loadAccounts() {
+  accountsLoading.value = true
+  accountsError.value = ''
+  try {
+    const res = await platformApi.accounts(currentEnt.value.id, { page: accountsPage.value, size: accountsSize.value })
+    accounts.value = (res?.list || []).map(a => ({
+      portalUserId: a.portal_user_id ?? a.portalUserId ?? a.username,
+      username: a.username,
+      phone: a.phone,
+      status: a.status,
+      enterpriseRole: a.enterprise_role ?? a.enterpriseRole ?? 0,
+      isOwner: !!(a.is_owner ?? a.isOwner)
+    }))
+    accountsTotal.value = res?.total ?? accounts.value.length
+  } catch (e) {
+    accounts.value = []
+    accountsTotal.value = 0
+    accountsError.value = e?.message || '该企业暂无账号或尚未激活'
+  } finally {
+    accountsLoading.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -126,4 +222,11 @@ onMounted(load)
 .ent-name { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
 .ent-code { font-size: 11.5px; color: var(--cs-text-tertiary); font-family: Consolas, monospace; }
 .pagination-bar { display: flex; justify-content: flex-end; margin-top: 16px; }
+.acc-body { min-height: 120px; }
+.acc-user { display: flex; align-items: center; gap: 6px; }
+.acc-name { font-size: 13px; color: var(--cs-text-primary); }
+.acc-owner { font-size: 10px; padding: 0 5px; border-radius: 3px; background: var(--cs-primary-lighter); color: var(--cs-primary); }
+.acc-error { padding: 24px 4px; font-size: 12.5px; color: var(--cs-text-tertiary); text-align: center; }
+.acc-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.acc-total { font-size: 12px; color: var(--cs-text-tertiary); }
 </style>

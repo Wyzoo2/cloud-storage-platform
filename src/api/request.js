@@ -112,9 +112,18 @@ request.interceptors.response.use(
       redirectToLogin(message || '请先登录')
       return Promise.reject(new Error(message || '请先登录'))
     }
+    // 40208 配额不足：按 message 分流引导（个人额度 / 企业套餐 / 企业空间）
+    if (code === 40208) {
+      const msg = message || '存储额度已满'
+      if (/企业套餐已到期/.test(msg)) return fail(`${msg}（可到「套餐增值」页续费）`, silent)
+      if (/企业空间不足/.test(msg)) return fail(`${msg}（续费套餐或联系管理员调整分配）`, silent)
+      return fail(`${msg}（个人额度不足，可在「增额申请」提交）`, silent)
+    }
     if (code === 40301) {
       refreshPermissions()
-      return failOnce(message || '无权限访问', silent)
+      const msg403 = message || '无权限访问'
+      if (/企业空间已超额/.test(msg403)) return failOnce(`${msg403}（请联系管理员缩减分配或续费套餐）`, silent)
+      return failOnce(msg403, silent)
     }
     // 40400：后端明确"接口不存在"（通常是新功能还没上线），给一句能看懂的话
     if (code === 40400) {

@@ -109,7 +109,7 @@ function initTopUsersChart() {
       trigger: 'axis', axisPointer: { type: 'shadow' },
       formatter: p => {
         const item = sorted[p[0].dataIndex]
-        return `${item.username}<br/>已用: ${formatSize(item.usedBytes)}<br/>配额: ${formatSize(item.quotaBytes)}`
+        return `${item.nickname || item.username}<br/>已用: ${formatSize(item.usedBytes)}<br/>配额: ${formatSize(item.quotaBytes)}`
       }
     },
     grid: { left: 80, right: 30, top: 10, bottom: 20 },
@@ -121,7 +121,7 @@ function initTopUsersChart() {
     },
     yAxis: {
       type: 'category',
-      data: sorted.map(u => u.username),
+      data: sorted.map(u => u.nickname || u.username),
       axisLabel: { color: getTextColor() },
       axisLine: { show: false },
       axisTick: { show: false }

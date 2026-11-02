@@ -53,7 +53,15 @@ export const usePermissionStore = defineStore('permission', () => {
   const enterpriseName = computed(() => ctx.value?.enterprise?.name || ctx.value?.enterpriseName || '')
   const deptPath = computed(() => ctx.value?.deptPath || '')
   const nickname = computed(() => ctx.value?.nickname || '')
-  const roles = computed(() => ctx.value?.roles || [])
+  // 后端 roles 可能是数组（多角色）或单个对象（当前实现），统一成数组
+  const roles = computed(() => {
+    const r = ctx.value?.roles
+    if (!r) return []
+    return Array.isArray(r) ? r : [r]
+  })
+  // 企业空间超额（可分配为负）：后端在 /me/context、/auth/login、/billing/quota 都下发
+  const enterpriseSuspended = computed(() => !!ctx.value?.enterpriseSuspended)
+  const enterpriseNotice = computed(() => ctx.value?.enterpriseNotice || '企业可分配额度为负，部分核心功能无法使用')
 
   function can(code) {
     if (!code) return true
@@ -89,7 +97,7 @@ export const usePermissionStore = defineStore('permission', () => {
 
   return {
     ctx, loaded, loading, legacy, perms,
-    isPlatform, isEnterpriseAdmin, identity, identityLabel, dataScope, enterpriseId, enterpriseName, deptPath, nickname, roles,
+    isPlatform, isEnterpriseAdmin, identity, identityLabel, enterpriseSuspended, enterpriseNotice, dataScope, enterpriseId, enterpriseName, deptPath, nickname, roles,
     can, load, reset
   }
 })

@@ -60,7 +60,7 @@
           <el-table-column label="最近登录" min-width="200">
             <template #default="{ row }">{{ row.lastLoginAt ? formatDate(row.lastLoginAt) : '--' }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="250">
+          <el-table-column label="操作" width="200" align="center">
             <template #default="{ row }">
               <el-button v-perm="'org.member.manage'" link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
             </template>

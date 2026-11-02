@@ -46,7 +46,7 @@
               <h4>详细信息</h4>
               <el-descriptions :column="2" border size="small">
                 <el-descriptions-item label="日志ID">{{ row.id }}</el-descriptions-item>
-                <el-descriptions-item label="操作人">{{ row.username || ('ID ' + row.userId) }}</el-descriptions-item>
+                <el-descriptions-item label="操作人">{{ row.actorName || row.username || ('ID ' + row.userId) }}</el-descriptions-item>
                 <el-descriptions-item label="动作">{{ actionLabel(row.action) }}</el-descriptions-item>
                 <el-descriptions-item label="目标">{{ targetLabel(row) }}</el-descriptions-item>
                 <el-descriptions-item label="IP地址">{{ row.ip || '--' }}</el-descriptions-item>
@@ -60,7 +60,7 @@
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
         <el-table-column prop="userId" label="操作人" width="120">
-          <template #default="{ row }"><span class="user-cell">{{ row.username || ('ID ' + row.userId) }}</span></template>
+          <template #default="{ row }"><span class="user-cell">{{ row.actorName || row.username || ('ID ' + row.userId) }}</span></template>
         </el-table-column>
         <el-table-column prop="action" label="动作" width="140">
           <template #default="{ row }"><el-tag size="small" :type="actionTagType(row.action)">{{ actionLabel(row.action) }}</el-tag></template>
@@ -153,7 +153,7 @@ function detailText(row) {
 }
 function targetLabel(row) {
   const d = parseDetail(row)
-  return d?.name || row.target || '--'
+  return row.targetName || d?.name || row.target || '--'
 }
 
 onMounted(() => {

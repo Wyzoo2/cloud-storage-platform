@@ -2,8 +2,8 @@
   <div class="layout-admin">
     <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': mobileMenuOpen }">
       <div class="sidebar-header">
-        <div class="logo-badge"><el-icon :size="20" color="#fff"><Coin /></el-icon></div>
-        <span v-show="!isCollapsed" class="sidebar-title">CloudVault</span>
+        <div class="logo-badge"><img :src="logoUrl" alt="优芽云存储" class="logo-img" /></div>
+        <span v-show="!isCollapsed" class="sidebar-title">优芽云存储</span>
         <el-tag v-show="!isCollapsed" size="small" type="danger" effect="dark">管理端</el-tag>
       </div>
       <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
@@ -50,6 +50,9 @@
           <el-tag v-if="perm.enterpriseName" size="small" effect="plain" class="enterprise-chip">{{ perm.enterpriseName }}</el-tag>
           <el-tag v-if="currentRoleName" size="small" effect="plain" class="role-chip">{{ currentRoleName }}</el-tag>
           <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
+          <span v-if="walletStore.walletState === 'ok'" class="wallet-chip" :class="{ frozen: walletStore.wallet.frozen }">
+            余额 <b>¥{{ walletStore.wallet.balanceYuan }}</b>
+          </span>
           <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
             <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
           </button>
@@ -67,6 +70,7 @@
           </el-dropdown>
         </div>
       </header>
+      <EnterpriseNoticeBar />
       <main class="content">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in"><component :is="Component" /></transition>
@@ -83,8 +87,11 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import logoUrl from '@/assets/logo.png'
 import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
+import EnterpriseNoticeBar from '@/components/EnterpriseNoticeBar.vue'
+import { useBillingStore } from '@/stores/billing'
 import { ADMIN_MENUS, USER_MENUS, filterMenus } from '@/constants/menus'
 // 已按需求停用：强制改密弹框
 // import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
@@ -94,6 +101,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const perm = usePermissionStore()
+const walletStore = useBillingStore()
+// 超额横幅：本次会话关掉后不再打扰（刷新/重新登录后会重新提示）
 
 // 菜单显隐 = 权限点 × 身份（系统管理员 / 企业管理员）；legacy 时隐藏依赖新接口的菜单
 // 当前账号角色名（/me/context.roles）
@@ -121,6 +130,7 @@ function updateViewport() {
 }
 
 onMounted(() => {
+  walletStore.loadWallet()
   updateViewport()
   // 平板端（<=1024 且 >768）默认折叠侧边栏
   if (window.innerWidth <= 1024 && window.innerWidth > 768) {
@@ -151,13 +161,18 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 </script>
 
 <style scoped>
+.wallet-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 16px;
+  background: var(--cs-bg-hover); font-size: 12px; color: var(--cs-text-tertiary); }
+.wallet-chip b { font-size: 13px; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
+.wallet-chip.frozen b { color: var(--cs-danger); }
 .layout-admin { display: flex; height: 100vh; overflow: hidden; }
 .sidebar { width: var(--cs-sidebar-width); height: 100vh; background: var(--cs-sidebar-bg); border-right: 1px solid var(--cs-sidebar-border); display: flex; flex-direction: column; transition: width var(--cs-transition); flex-shrink: 0; overflow: hidden; }
 .sidebar.collapsed { width: 64px; }
 .sidebar-header { height: var(--cs-header-height); display: flex; align-items: center; padding: 0 16px; gap: 10px; border-bottom: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
 .sidebar.collapsed .sidebar-header { justify-content: center; padding: 0; }
 .sidebar-title { font-size: 16px; font-weight: 700; color: #ffffff; white-space: nowrap; letter-spacing: -0.3px; }
-.logo-badge { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--cs-primary) 0%, var(--cs-primary-dark) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--cs-primary-shadow); }
+.logo-badge { width: 36px; height: 36px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: #fff; box-shadow: var(--cs-shadow); }
+.logo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sidebar-menu { flex: 1; border-right: none !important; padding: 8px; background: transparent !important; }
 .sidebar-menu .el-menu-item { position: relative; border-radius: var(--cs-radius); margin-bottom: 4px; height: 44px; line-height: 44px; transition: all 0.2s ease; color: var(--cs-sidebar-text); }
 .sidebar-menu .el-menu-item:hover { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }

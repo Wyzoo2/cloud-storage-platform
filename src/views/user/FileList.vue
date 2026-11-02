@@ -11,8 +11,8 @@
         </el-breadcrumb>
       </div>
       <div class="breadcrumb-actions">
-        <el-button v-perm="'file.upload'" type="primary" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
-        <el-button v-perm="'file.upload'" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
+        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" type="primary" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
+        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
         <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" type="warning" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
         <el-button v-if="deleteCount > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
       </div>
@@ -51,7 +51,7 @@
         <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
-              <el-button v-perm="'file.read'" link type="primary" size="small" @click="handleDownload(row)"><el-icon><Download /></el-icon><span>下载</span></el-button>
+              <el-button v-perm="'file.read'" link type="primary" size="small" :disabled="enterpriseSuspended" @click="handleDownload(row)"><el-icon><Download /></el-icon><span>下载</span></el-button>
               <el-button v-perm="'file.modify'" link type="primary" size="small" @click="handleRename(row)"><el-icon><EditPen /></el-icon><span>重命名</span></el-button>
               <el-popconfirm v-if="canDeleteAny" title="删除后进入回收站，确定？" width="220" @confirm="handleDelete(row.id)">
                 <template #reference><el-button link type="danger" size="small"><el-icon><Delete /></el-icon><span>删除</span></el-button></template>
@@ -235,6 +235,8 @@ function topLevelItems(items) {
 // 实际要删除的顶层节点数（删除按钮显示用）
 // 删除按钮：自己的文件需 file.delete，他人可见范围需 file.other.delete（列表不带归属，二者其一即可）
 const canDeleteAny = computed(() => perm.can(['file.delete', 'file.other.delete']))
+// 企业空间超额：上传/下载/预览被暂停，但列表仍可浏览（后端 40301 兜底）
+const enterpriseSuspended = computed(() => perm.enterpriseSuspended)
 const deleteCount = computed(() => topLevelItems(selectedRows.value).length)
 
 // 树形表格：给每行标记 hasChildren（文件夹才能展开）
@@ -434,6 +436,8 @@ function goUp() {
 
 function handleOpen(row) {
   if (row.isDir) { handleNavigate(row.id); return }
+  // 企业空间超额：预览与下载暂停（列表仍可浏览）
+  if (enterpriseSuspended.value) return ElMessage.warning('企业空间已超额，预览与下载已暂停，请联系管理员')
   openPreview(row)
 }
 
@@ -471,7 +475,7 @@ async function openPreview(row) {
 async function loadUrlPreview(row) {
   previewLoading.value = true
   try {
-    const { url } = await uploadApi.getPreviewUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id)
     previewUrl.value = url
   } catch (e) {
     previewVisible.value = false
@@ -484,7 +488,7 @@ async function loadUrlPreview(row) {
 async function loadTextPreview(row) {
   previewLoading.value = true
   try {
-    const { url } = await uploadApi.getPreviewUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id)
     const resp = await fetch(url)
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     previewText.value = await resp.text()
@@ -514,7 +518,7 @@ async function previewOffice(row) {
       previewVisible.value = false
       return
     }
-    const { url } = await uploadApi.getPreviewUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id)
     const resp = await fetch(url)
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     const container = officeContainer.value

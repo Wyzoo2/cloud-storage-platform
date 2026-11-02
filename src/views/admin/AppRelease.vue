@@ -59,7 +59,7 @@
         <el-table-column prop="createdAt" label="创建时间" min-width="160">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="340" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
               <template v-if="row.status === 'published'">
@@ -503,11 +503,7 @@ onMounted(fetchList)
 .text-muted {
   color: var(--el-text-color-placeholder);
 }
-.op-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
+.op-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 4px 10px; white-space: nowrap; }
 .file-selected {
   width: 100%;
   display: flex;

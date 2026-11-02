@@ -1,4 +1,4 @@
-// Electron 主进程：CloudVault 桌面端入口
+// Electron 主进程：优芽云存储 桌面端入口
 const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs')
@@ -22,7 +22,7 @@ function createWindow() {
     autoHideMenuBar: true,
     // 窗口/任务栏图标：开发模式生效（生产模式 Windows 优先用 exe 内嵌图标；文件不存在时自动忽略）
     icon: path.join(__dirname, '../build/icon.ico'),
-    title: 'CloudVault 云存储平台',
+    title: '优芽云存储 云存储平台',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -122,7 +122,7 @@ ipcMain.handle('desktop:download-and-install', async (_e, payload) => {
   if (!downloadUrl) throw new Error('下载地址为空')
 
   const tmpDir = app.getPath('temp')
-  const installer = path.join(tmpDir, `CloudVault-Setup-${Date.now()}.exe`)
+  const installer = path.join(tmpDir, `优芽云存储-Setup-${Date.now()}.exe`)
 
   // 1. 下载（nginx 静态目录直连）
   await downloadFile(downloadUrl, installer, percent => {
@@ -142,7 +142,7 @@ ipcMain.handle('desktop:download-and-install', async (_e, payload) => {
   //    用 VBS + wscript 完全无窗口执行（cmd bat 方案会闪黑窗，体验差）
   //    VBS 字符串内双引号用 "" 转义；installer 路径无引号字符，直接嵌入 OK
   //    sh.Run 第二参数 0=隐藏窗口，第三参数 True=等 NSIS 装完再删安装包；vbs 残留无害（句柄占用删不掉）
-  const vbs = path.join(tmpDir, `cloudvault-update-${Date.now()}.vbs`)
+  const vbs = path.join(tmpDir, `优芽云存储-update-${Date.now()}.vbs`)
   const vbsLines = [
     'Set fso = CreateObject("Scripting.FileSystemObject")',
     'Set sh = CreateObject("WScript.Shell")',

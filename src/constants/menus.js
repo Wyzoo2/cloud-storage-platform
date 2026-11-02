@@ -61,6 +61,7 @@ export const USER_MENUS = [
   { path: '/transfers', title: '传输任务', icon: 'Upload', perm: 'transfer.read', scope: 'both' },
   { path: '/recycle', title: '回收站', icon: 'Delete', perm: 'recycle.read', scope: 'both' },
   { path: '/billing', title: '增额申请', icon: 'Wallet', perm: ['increase.apply', 'increase.read'], scope: 'both' },
+  { path: '/packages', title: '套餐增值', icon: 'Goods', scope: 'both' },
   { path: '/profile', title: '个人中心', icon: 'User', scope: 'both' }
 ]
 

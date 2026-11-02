@@ -63,9 +63,9 @@
         <div class="panel-body" v-loading="logLoading">
           <div v-if="logs.length" class="log-list">
             <div v-for="l in logs" :key="l.id" class="log-item">
-            <span class="log-user">{{ l.username || ('ID ' + l.userId) }}</span>
+            <span class="log-user">{{ l.actorName || l.username || ('ID ' + l.userId) }}</span>
                 <el-tag size="small" :type="actionType(l.action)" effect="plain">{{ actionLabel(l.action) }}</el-tag>
-                <span class="log-target">{{ l.target || '--' }}</span>
+                <span class="log-target">{{ l.targetName || l.target || '--' }}</span>
                 <span class="log-time">{{ l.createdAt ? formatDate(l.createdAt) : '' }}</span>
               </div>
           </div>

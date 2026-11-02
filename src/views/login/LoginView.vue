@@ -10,9 +10,9 @@
     </button>
     <div class="login-container">
       <div class="login-brand">
-        <div class="brand-icon"><el-icon :size="48" color="#fff"><Coin /></el-icon></div>
-        <h1 class="brand-title">CloudVault</h1>
-        <p class="brand-desc">私有云存储平台</p>
+        <div class="brand-icon"><img :src="logoUrl" alt="优芽云存储" class="brand-logo" /></div>
+        <h1 class="brand-title">优芽云存储</h1>
+        <p class="brand-desc">优芽云存储平台</p>
         <div class="brand-features">
           <div class="feature-item"><el-icon :size="20"><UploadFilled /></el-icon><span>分片上传 / 秒传 / 断点续传</span></div>
           <div class="feature-item"><el-icon :size="20"><Lock /></el-icon><span>数据本地存储 / 安全可控</span></div>
@@ -40,7 +40,7 @@
             </el-button>
           </el-form-item>
         </el-form>
-        <div class="login-footer"><span class="footer-text">© 2026 CloudVault · 私有化部署方案</span></div>
+        <div class="login-footer"><span class="footer-text">© 2026 优芽云存储 · 私有化部署方案</span></div>
       </div>
     </div>
   </div>
@@ -55,6 +55,7 @@ import { useUserStore } from '@/stores/user'
 import { usePermissionStore } from '@/stores/permission'
 import { landingPath } from '@/utils/landing'
 import { useAppStore } from '@/stores/app'
+import logoUrl from '@/assets/logo.png'
 import { authApi } from '@/api'
 
 const router = useRouter()
@@ -115,8 +116,8 @@ async function handleLogin() {
 .login-brand { width: 400px; background: linear-gradient(135deg, #1677ff 0%, #4096ff 50%, #764ba2 100%); padding: 48px 36px; display: flex; flex-direction: column; justify-content: center; color: #fff; flex-shrink: 0; position: relative; overflow: hidden; }
 .login-brand::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.14) 1px, transparent 1px); background-size: 22px 22px; pointer-events: none; }
 [data-theme="dark"] .login-brand { background: linear-gradient(135deg, #0f1b33 0%, #131c31 50%, #1b1b35 100%); border-right: 1px solid var(--cs-border); }
-.brand-icon { width: 72px; height: 72px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.25); border-radius: 18px; display: flex; align-items: center; justify-content: center; margin-bottom: 22px; backdrop-filter: blur(10px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-[data-theme="dark"] .brand-icon { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35); box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.brand-icon { width: 72px; height: 72px; border-radius: 18px; overflow: hidden; margin-bottom: 22px; background: #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+.brand-logo { width: 100%; height: 100%; object-fit: cover; display: block; }
 .brand-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.5px; }
 .brand-desc { font-size: 14px; opacity: 0.85; margin-bottom: 40px; }
 .brand-features { display: flex; flex-direction: column; gap: 18px; position: relative; z-index: 1; }
@@ -149,6 +150,7 @@ async function handleLogin() {
   .login-container { width: 94%; }
   .login-brand { padding: 24px 20px; }
   .brand-icon { width: 56px; height: 56px; margin-bottom: 12px; }
+  .brand-logo { width: 100%; height: 100%; object-fit: cover; display: block; }
   .brand-title { font-size: 22px; }
   .brand-desc { font-size: 13px; margin-bottom: 0; }
   .login-form-wrapper { padding: 24px 20px; }

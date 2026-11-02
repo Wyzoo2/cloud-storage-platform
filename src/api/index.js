@@ -103,16 +103,9 @@ export const billingAdminApi = {
 }
 
 // ===== 计费（用户端）=====
-export const billingApi = {
-  // 获取计费配置（公开，需登录）
-  getConfig: () => request.get('/billing/config'),
-  // 获取当前用户额度信息
-  getQuota: () => request.get('/billing/quota'),
-  // 提交增额申请：{ gbCount, remark? }
-  createRequest: data => request.post('/billing/increase-requests', data),
-  // 我的申请列表：{ page, size } → { list, total }
-  listMyRequests: params => request.get('/billing/increase-requests', { params })
-}
+// 统一用 ./billing 里的实现（含 getConfig / getQuota / wallet / packages / 增额申请），
+// 这里只做再导出，避免两份对象不一致导致 billingApi.packages / wallet 为 undefined
+export { billingApi } from './billing'
 
 // ===== 传输任务列表（后端持久化任务记录）=====
 export const uploadTaskListApi = {
@@ -190,9 +183,42 @@ export const enterpriseApi = {
   // { total, list: [{ localUserId, displayName, allocatedBytes, usedBytes, enterpriseRole }] }
   allocations: () => request.get('/enterprise/allocations'),
   // 设为语义：bytes 为目标额度，0 = 收回；返回 { localUserId, allocatedBytes, pool }
-  setAllocation: (localUserId, bytes) => request.put(`/enterprise/allocations/${localUserId}`, { bytes })
+  setAllocation: (localUserId, bytes) => request.put(`/enterprise/allocations/${localUserId}`, { bytes }),
+  // 企业套餐清单：{ total, list: [{ orderItemId, skuId, skuName, quotaGb, priceCents, grantedBytes, status, expireAt, reclaimedAt }] }
+  subscriptions: () => request.get('/enterprise/subscriptions'),
+  // 续费：只返回「要买什么 + 幂等键」clientOrderKey，真正下单还要调 POST /orders
+  // 续费一步完成：后端直接建门户订单并延期，返回 portalOrderId / expireAtAfter / priceYuan / pool
+  // 续费一步完成（后端建门户订单并延期）。兼容两种部署：新版 /billing 前缀，旧版 /enterprise 前缀
+  renewSubscription: orderItemId => request
+    .post(`/billing/subscriptions/${orderItemId}/renew`, null, { silent: true })
+    .catch(err => {
+      const msg = String(err?.message || '')
+      if (/404|未上线|不支持|405/.test(msg)) {
+        return request.post(`/enterprise/subscriptions/${orderItemId}/renew`, null, { silent: true })
+      }
+      throw err
+    })
 }
+// ===== 订单（门户下单；本地账号无门户映射会 40000）=====
+export const orderApi = {
+  // { skuId, quantity, clientOrderKey? } → { order_id, status, ... }
+  create: data => request.post('/orders', data),
+  // 轮询开通状态
+  detail: orderId => request.get(`/orders/${orderId}`)
+}
+
 export const platformApi = {
-  // { status?, page, size } → { list: [{ id, code, name, status, ownerUserId, expireAt, createdAt }], total }
-  enterprises: params => request.get('/admin/enterprises', { params })
+  // 企业列表：后端用 offset/limit 分页（不是 page/size），这里做一次换算
+  // → { total, returned, offset, list: [{ enterprise_id, code, name, status, member_count, expire_at, created_at }] }
+  enterprises: ({ page = 1, size = 20, ...rest } = {}) =>
+    request.get('/admin/enterprises', {
+      params: { ...rest, offset: Math.max(0, (page - 1) * size), limit: size }
+    }),
+  // 企业下的门户账号（未激活企业会返回 40000 该企业尚未激活）
+  // 企业下的门户账号（同样 offset/limit；未激活企业返回 40000）
+  // → { enterprise_id, total, returned, offset, list:[{ portal_user_id, username, phone, user_type, status, enterprise_role, is_owner }] }
+  accounts: (enterpriseId, { page = 1, size = 20 } = {}) =>
+    request.get(`/admin/enterprises/${enterpriseId}/accounts`, {
+      params: { offset: Math.max(0, (page - 1) * size), limit: size }
+    })
 }

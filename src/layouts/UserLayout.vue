@@ -2,8 +2,8 @@
   <div class="layout-user">
     <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': mobileMenuOpen }">
       <div class="sidebar-header">
-        <div class="logo-badge"><el-icon :size="20" color="#fff"><Coin /></el-icon></div>
-        <span v-show="!isCollapsed" class="sidebar-title">CloudVault</span>
+        <div class="logo-badge"><img :src="logoUrl" alt="优芽云存储" class="logo-img" /></div>
+        <span v-show="!isCollapsed" class="sidebar-title">优芽云存储</span>
       </div>
       <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
         <el-menu-item v-for="m in visibleMenus" :key="m.path" :index="m.path">
@@ -48,6 +48,9 @@
         </div>
         <div class="header-right">
           <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
+          <span v-if="billingStore.walletState === 'ok'" class="wallet-chip" :class="{ frozen: billingStore.wallet.frozen }">
+            余额 <b>¥{{ billingStore.wallet.balanceYuan }}</b>
+          </span>
           <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
             <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
           </button>
@@ -66,6 +69,7 @@
           </el-dropdown>
         </div>
       </header>
+      <EnterpriseNoticeBar />
       <main class="content">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in"><component :is="Component" /></transition>
@@ -83,9 +87,11 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElNotification } from 'element-plus'
 import { useAppStore } from '@/stores/app'
+import logoUrl from '@/assets/logo.png'
 import { useUserStore } from '@/stores/user'
 import { useBillingStore } from '@/stores/billing'
 import { usePermissionStore } from '@/stores/permission'
+import EnterpriseNoticeBar from '@/components/EnterpriseNoticeBar.vue'
 import { USER_MENUS, filterMenus } from '@/constants/menus'
 import { fetchUploadTasks } from '@/utils/uploadTaskStore'
 // 已按需求停用：强制改密弹框
@@ -97,6 +103,7 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const billingStore = useBillingStore()
 const perm = usePermissionStore()
+// 超额横幅：本次会话关掉后不再打扰（刷新/重新登录后会重新提示）
 
 // 菜单显隐按权限点；legacy 降级时隐藏依赖新接口的菜单（如「成员文件」）
 const visibleMenus = computed(() => filterMenus(USER_MENUS, perm.can, { legacy: perm.legacy, identity: perm.identity }))
@@ -139,6 +146,7 @@ function updateViewport() {
 }
 
 onMounted(() => {
+  billingStore.loadWallet()
   updateViewport()
   // 只在该账号具备对应权限时才发请求，避免缺权限的账号一进页面就连弹提示
   if (perm.can('transfer.read')) notifyPendingTransfers()
@@ -192,13 +200,18 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 </script>
 
 <style scoped>
+.wallet-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 16px;
+  background: var(--cs-bg-hover); font-size: 12px; color: var(--cs-text-tertiary); }
+.wallet-chip b { font-size: 13px; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
+.wallet-chip.frozen b { color: var(--cs-danger); }
 .layout-user { display: flex; height: 100vh; overflow: hidden; }
 .sidebar { width: var(--cs-sidebar-width); height: 100vh; background: var(--cs-sidebar-bg); border-right: 1px solid var(--cs-sidebar-border); display: flex; flex-direction: column; transition: width var(--cs-transition); flex-shrink: 0; overflow: hidden; }
 .sidebar.collapsed { width: 64px; }
 .sidebar-header { height: var(--cs-header-height); display: flex; align-items: center; padding: 0 16px; gap: 10px; border-bottom: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
 .sidebar.collapsed .sidebar-header { justify-content: center; padding: 0; }
 .sidebar-title { font-size: 16px; font-weight: 700; color: #ffffff; white-space: nowrap; letter-spacing: -0.3px; }
-.logo-badge { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--cs-primary) 0%, var(--cs-primary-dark) 100%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: var(--cs-shadow); }
+.logo-badge { width: 36px; height: 36px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: #fff; box-shadow: var(--cs-shadow); }
+.logo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .sidebar-menu { flex: 1; border-right: none !important; padding: 8px; background: transparent !important; }
 .sidebar-menu .el-menu-item { position: relative; border-radius: var(--cs-radius); margin-bottom: 4px; height: 44px; line-height: 44px; transition: all 0.2s ease; color: var(--cs-sidebar-text); }
 .sidebar-menu .el-menu-item:hover { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }

@@ -36,7 +36,7 @@
         <el-table-column prop="createdAt" label="申请时间" min-width="170">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="op-actions">
               <template v-if="row.status === 'pending'">
@@ -154,7 +154,7 @@ onMounted(fetchList)
 .toolbar-right { flex-shrink: 0; }
 .amount-cell { font-weight: 600; color: var(--cs-primary); }
 .remark-text { color: var(--cs-text-secondary); font-size: 13px; }
-.op-actions { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.op-actions { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .op-actions .el-button { margin-left: 0; }
 .op-actions .el-button + .el-button { margin-left: 0; }
 .op-actions .el-button .el-icon + span { margin-left: 4px; }
