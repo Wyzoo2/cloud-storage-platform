@@ -157,7 +157,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Goods, Refresh } from '@element-plus/icons-vue'
 import { billingApi, enterpriseApi, orderApi } from '@/api'
@@ -281,7 +281,6 @@ function startRenewCooldown(seconds = 3) {
     if (renewCooldown.value <= 0) { clearInterval(renewCooldownTimer); renewCooldownTimer = null; renewCooldown.value = 0 }
   }, 1000)
 }
-onBeforeUnmount(() => { if (renewCooldownTimer) clearInterval(renewCooldownTimer) })
 
 function canRenew(row) {
   if (renewCooldown.value > 0) return false
