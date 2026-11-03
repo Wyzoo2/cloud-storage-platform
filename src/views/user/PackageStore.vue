@@ -157,6 +157,7 @@ import OrderConfirmDialog from '@/components/OrderConfirmDialog.vue'
 import ProvisionDialog from '@/components/ProvisionDialog.vue'
 import { orderIdOf, pollProvision } from '@/utils/provision'
 import { usePermissionStore } from '@/stores/permission'
+import { useBillingStore } from '@/stores/billing'
 import { formatDate, formatRemain, remainMs } from '@/utils/file'
 
 const perm = usePermissionStore()
@@ -167,7 +168,6 @@ const renewing = ref(0)
 
 const packages = ref({ total: 0, canPurchase: false, denyReason: '', buyerType: '', list: [] })
 const subscriptions = ref([])
-const wallet = ref(null)
 const packagesError = ref(false)
 
 /* ---------------- 摘要（数据驱动，不写死文案） ---------------- */
@@ -309,15 +309,13 @@ async function loadSubscriptions() {
   }
 }
 
-// 余额只用于预检与展示；查不到不影响下单
-async function loadWallet() {
-  try {
-    wallet.value = await billingApi.wallet()
-  } catch (e) {
-    wallet.value = null
-  }
-}
+// 余额统一走 billing store：顶栏与弹窗共用同一份数据，花钱后刷新一次两边都同步
+const billing = useBillingStore()
+const wallet = computed(() => (billing.walletState === 'ok' ? billing.wallet : null))
 
+async function loadWallet(force = false) {
+  await billing.refreshWallet({ force })
+}
 async function refreshAll() {
   loading.value = true
   try {
@@ -345,9 +343,12 @@ async function runOrder(title, payload) {
       else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
       else setProvision('timeout', 95, '开通结果待确认', '门户响应较慢，请稍后刷新查看。')
     }
-    await refreshAll()
+    await Promise.all([loadPackages(), loadSubscriptions()])
   } catch (e) {
     setProvision('failed', 100, '下单失败', e?.message || '')
+  } finally {
+    // 成功或失败都刷新一次余额，顶栏立即同步
+    await billing.refreshWallet({ force: true })
   }
 }
 
@@ -399,11 +400,13 @@ async function runRenew(payload) {
     } else {
       setProvision('done', 100, '续费成功，套餐已生效')
     }
-    await refreshAll()
+    await Promise.all([loadPackages(), loadSubscriptions()])
   } catch (e) {
     setProvision('failed', 100, '续费失败', e?.message || '')
   } finally {
     renewing.value = 0
+    // 成功或失败都刷新一次余额，顶栏立即同步
+    await billing.refreshWallet({ force: true })
   }
 }
 onMounted(refreshAll)

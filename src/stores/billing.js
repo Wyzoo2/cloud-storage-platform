@@ -48,15 +48,31 @@ export const useBillingStore = defineStore('billing', () => {
     }
   }
 
-  async function loadWallet() {
-    try {
-      wallet.value = await billingApi.wallet()
-      walletState.value = 'ok'
-    } catch (e) {
-      // 本地账号无门户映射 → 不适用；门户不可用 → 降级不显示
-      walletState.value = String(e?.message || '').includes('未关联门户') ? 'unsupported' : 'error'
-    }
+  // 钱包余额：任何「花钱」的动作（买套餐 / 续费）结束后都要重新拉一次，让顶栏余额立即同步。
+  // walletLoading 做并发去重：同一时刻多个调用只发一次请求。
+  let walletLoading = null
+  let walletFetchedAt = 0
+  async function refreshWallet({ force = false } = {}) {
+    if (walletLoading) return walletLoading
+    // 非强制时 1.5s 内复用刚拉到的结果，避免页面初始化连点造成重复请求
+    if (!force && walletState.value === 'ok' && Date.now() - walletFetchedAt < 1500) return
+    walletLoading = (async () => {
+      try {
+        wallet.value = await billingApi.wallet()
+        walletState.value = 'ok'
+        walletFetchedAt = Date.now()
+      } catch (e) {
+        // 本地账号无门户映射 → 不适用；门户不可用 → 降级不显示
+        walletState.value = String(e?.message || '').includes('未关联门户') ? 'unsupported' : 'error'
+      } finally {
+        walletLoading = null
+      }
+    })()
+    return walletLoading
   }
+
+  // 兼容旧调用名
+  const loadWallet = () => refreshWallet()
 
   async function loadRequests(page = 1, size = 5) {
     if (!allowed('increase.read')) return
@@ -84,5 +100,5 @@ export const useBillingStore = defineStore('billing', () => {
     return billingApi.createIncrease({ gbCount, remark })
   }
 
-  return { config, quota, totalBytes, wallet, walletState, requests, reqTotal, reqPages, loading, loadConfig, loadQuota, loadWallet, loadRequests, loadRequestsForCheck, submitIncrease }
+  return { config, quota, totalBytes, wallet, walletState, requests, reqTotal, reqPages, loading, loadConfig, loadQuota, loadWallet, refreshWallet, loadRequests, loadRequestsForCheck, submitIncrease }
 })

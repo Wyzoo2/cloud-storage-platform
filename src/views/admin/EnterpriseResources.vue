@@ -428,6 +428,8 @@ async function runRenew(payload) {
     setProvision('failed', 100, '续费失败', e?.message || '')
   } finally {
     renewing.value = 0
+    // 续费成功或失败都重新拉一次余额，顶栏立即同步
+    await billing.refreshWallet({ force: true })
   }
 }
 async function refreshAll() {
