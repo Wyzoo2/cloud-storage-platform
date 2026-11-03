@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { billingApi } from '@/api/billing'
+import { forceLogout } from '@/api/request'
 import { usePermissionStore } from '@/stores/permission'
 
 export const useBillingStore = defineStore('billing', () => {
@@ -61,6 +62,8 @@ export const useBillingStore = defineStore('billing', () => {
         wallet.value = await billingApi.wallet()
         walletState.value = 'ok'
         walletFetchedAt = Date.now()
+        // 钱包被冻结 = 账号不允许继续使用，直接强制下线（提示去重，避免并发重复弹）
+        if (wallet.value?.frozen) forceLogout('账号已被冻结，请联系管理员')
       } catch (e) {
         // 本地账号无门户映射 → 不适用；门户不可用 → 降级不显示
         walletState.value = String(e?.message || '').includes('未关联门户') ? 'unsupported' : 'error'

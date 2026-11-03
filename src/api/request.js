@@ -69,6 +69,31 @@ function redirectToLogin(tip = '登录已过期，请重新登录') {
   router.push('/login')
 }
 
+/**
+ * 强制下线：账号被禁用 / 钱包被冻结等「不允许继续使用」的状态。
+ * 清掉本地登录态并跳登录页；同一时间只提示一次，避免多接口并发时连弹。
+ */
+let lastForceLogoutAt = 0
+export function forceLogout(tip = '账号状态异常，请重新登录') {
+  CLEAR_KEYS.forEach(k => localStorage.removeItem(k))
+  // 同步清掉内存里的登录态与权限上下文（动态引入，避免与 store 形成循环依赖）
+  import('@/stores/user')
+    .then(m => {
+      const s = m.useUserStore()
+      s.token = ''
+      s.username = ''
+      s.nickname = ''
+      s.userId = ''
+    })
+    .catch(() => {})
+  import('@/stores/permission').then(m => m.usePermissionStore().reset()).catch(() => {})
+  const now = Date.now()
+  if (now - lastForceLogoutAt < 3000) return
+  lastForceLogoutAt = now
+  ElMessage.warning(tip)
+  if (router.currentRoute.value.path !== '/login') router.replace('/login')
+}
+
 /** 用 refreshToken 换新令牌后重放；失败即去登录（40103 的死循环防护见下） */
 function refreshAndReplay(config) {
   const refreshToken = localStorage.getItem('cs-refresh-token')
@@ -105,6 +130,11 @@ request.interceptors.response.use(
     if (isLogoutRequest(response.config)) return Promise.reject(new Error(message || 'logout'))
 
     // 登录类错误：只提示，不刷新令牌、不跳登录（否则会把"密码错误"变成"登录已过期"）
+    // 40102 账号已被禁用（管理员禁用/停用）→ 立即强制下线，不能继续操作
+    if (code === 40102) {
+      forceLogout('账号已被禁用，请联系管理员')
+      return Promise.reject(new Error('账号已被禁用'))
+    }
     if (LOGIN_ERRORS[code]) return fail(message || LOGIN_ERRORS[code], silent)
 
     if (code === 40103) return refreshAndReplay(response.config)
@@ -143,6 +173,11 @@ request.interceptors.response.use(
     if (isLogoutRequest(error.config)) return Promise.reject(error)
 
     // 登录类错误可能以 HTTP 401 返回，必须排在下面的 401 分支之前
+    // 40102 账号已被禁用 → 强制下线
+    if (bodyCode === 40102) {
+      forceLogout('账号已被禁用，请联系管理员')
+      return Promise.reject(new Error('账号已被禁用'))
+    }
     if (LOGIN_ERRORS[bodyCode]) {
       return fail(error.response?.data?.message || LOGIN_ERRORS[bodyCode], silent)
     }
