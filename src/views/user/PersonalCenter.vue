@@ -106,13 +106,13 @@
       <div class="cs-card info-card">
         <h3>账户信息</h3>
         <el-descriptions :column="1" border style="margin-top: 20px">
-          <el-descriptions-item label="显示名称">{{ userStore.displayName || perm.nickname }}</el-descriptions-item>
-          <el-descriptions-item v-if="accountOf(userStore)" label="登录账号">{{ userStore.username }}</el-descriptions-item>
+          <el-descriptions-item label="登录账号">{{ userStore.displayName || perm.nickname }}</el-descriptions-item>
+          <!-- <el-descriptions-item v-if="accountOf(userStore)" label="登录账号">{{ userStore.username }}</el-descriptions-item> -->
           <el-descriptions-item label="账号身份">
             <el-tag :type="identityType" effect="plain">{{ perm.identityLabel }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="我的角色">{{ perm.roles?.[0]?.name || '未分配' }}</el-descriptions-item>
-          <el-descriptions-item label="用户 ID">{{ userStore.userId || '--' }}</el-descriptions-item>
+          <!-- <el-descriptions-item label="用户 ID">{{ userStore.userId || '--' }}</el-descriptions-item> -->
         </el-descriptions>
       </div>
     </div>
