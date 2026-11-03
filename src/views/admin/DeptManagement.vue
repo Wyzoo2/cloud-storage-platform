@@ -85,7 +85,7 @@
                 </template>
               </el-table-column>
               <el-table-column label="部门" min-width="150" show-overflow-tooltip>
-                <template #default="{ row }">{{ row.deptName || '公司节点' }}</template>
+                <template #default="{ row }">{{ row.deptName || companyName }}</template>
               </el-table-column>
               <el-table-column label="数据权限" width="170">
                 <template #default="{ row }">
@@ -134,12 +134,12 @@
             v-model="form.parentId"
             :options="parentOptions"
             :props="{ checkStrictly: true, emitPath: false, expandTrigger: 'click' }"
-            placeholder="不选 = 最外层部门"
+            placeholder="不选 = 公司（顶级）"
             clearable
             style="width: 100%"
           />
           <el-text size="small" type="info" style="width: 100%; margin-top: 4px">
-              不选则作为最外层部门
+              不选则归属公司「{{ companyName }}」
           </el-text>
         </el-form-item>
         <el-form-item label="排序">
@@ -161,9 +161,14 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, ArrowRight, OfficeBuilding, Plus } from '@element-plus/icons-vue'
 import { rbacSource } from '@/api/rbacSource'
+import { usePermissionStore } from '@/stores/permission'
 import { scopeLabel } from '@/constants/menus'
 import { displayName, accountOf } from '@/utils/user'
 import { formatDate } from '@/utils/file'
+
+const perm = usePermissionStore()
+// 顶级部门的「上级」就是公司本身（企业名称），没有时兜底为「公司」
+const companyName = computed(() => perm.enterpriseName || '公司')
 
 /* ---------------- 部门树 ---------------- */
 const tree = ref([])
@@ -197,7 +202,7 @@ const current = computed(() => rows.value.find(n => n.id === currentId.value) ||
 const parentName = computed(() => {
   if (!current.value) return '--'
   const p = rows.value.find(n => n.id === current.value.parentId)
-  return p ? p.name : '--'
+  return p ? p.name : companyName
 })
 const childCount = computed(() => (current.value ? treeChildrenOf(current.value.id).length : 0))
 
@@ -334,7 +339,7 @@ async function removeCurrent() {
   const dept = current.value
   if (!dept) return
   const ok = await ElMessageBox.confirm(
-    `确定删除部门「${dept.name}」？其下成员会变为「公司节点」，子部门需先移走。`,
+    `确定删除部门「${dept.name}」？其下成员会回到公司「${companyName.value}」，子部门需先移走。`,
     '删除部门',
     { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
   ).catch(() => false)
