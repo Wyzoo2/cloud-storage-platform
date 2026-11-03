@@ -188,18 +188,11 @@ export const enterpriseApi = {
   setAllocation: (localUserId, bytes) => request.put(`/enterprise/allocations/${localUserId}`, { bytes }),
   // 企业套餐清单：{ total, list: [{ orderItemId, skuId, skuName, quotaGb, priceCents, grantedBytes, status, expireAt, reclaimedAt }] }
   subscriptions: () => request.get('/enterprise/subscriptions'),
-  // 续费：只返回「要买什么 + 幂等键」clientOrderKey，真正下单还要调 POST /orders
-  // 续费一步完成：后端直接建门户订单并延期，返回 portalOrderId / expireAtAfter / priceYuan / pool
-  // 续费一步完成（后端建门户订单并延期）。兼容两种部署：新版 /billing 前缀，旧版 /enterprise 前缀
-  renewSubscription: orderItemId => request
-    .post(`/billing/subscriptions/${orderItemId}/renew`, null, { silent: true })
-    .catch(err => {
-      const msg = String(err?.message || '')
-      if (/404|未上线|不支持|405/.test(msg)) {
-        return request.post(`/enterprise/subscriptions/${orderItemId}/renew`, null, { silent: true })
-      }
-      throw err
-    })
+  // 续费：一步完成（后端直接延长旧开通、容量不变）
+  // 旧路径 /enterprise/subscriptions/{id}/renew 已下线，这里不做改打旧接口的兜底：
+  // 续费是写操作，失败重试须复用同一笔幂等键，由页面层负责提示与重试
+  renewSubscription: orderItemId =>
+    request.post(`/billing/subscriptions/${orderItemId}/renew`, null, { silent: true })
 }
 // ===== 订单（门户下单；本地账号无门户映射会 40000）=====
 export const orderApi = {
