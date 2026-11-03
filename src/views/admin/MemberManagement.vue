@@ -39,9 +39,11 @@
           <el-table-column label="部门" min-width="250" show-overflow-tooltip>
             <template #default="{ row }">{{ row.deptName || '公司节点' }}</template>
           </el-table-column>
-          <el-table-column label="角色" width="150">
+          <el-table-column label="角色" min-width="180">
             <template #default="{ row }">
-              <el-tag v-if="roleNameFor(row)" size="small" effect="plain">{{ roleNameFor(row) }}</el-tag>
+              <div v-if="roleTags(row).length" class="role-tags">
+                <el-tag v-for="(name, i) in roleTags(row)" :key="name + i" size="small" effect="plain">{{ name }}</el-tag>
+              </div>
               <span v-else class="muted">--</span>
             </template>
           </el-table-column>
@@ -104,16 +106,21 @@
         </section>
 
         <section class="form-card">
-          <h4 class="card-title">角色 <span class="card-tip">每人仅一个</span></h4>
-          <el-select v-model="form.roleId" clearable placeholder="选择角色" style="width: 100%">
-            <el-option v-for="r in roleOptions" :key="r.id" :label="r.name" :value="r.id" />
-          </el-select>
+          <h4 class="card-title">角色 <span class="card-tip">可多选，权限取并集</span></h4>
+          <el-checkbox-group v-model="form.roleIds" class="role-list">
+            <el-checkbox v-for="r in roleOptions" :key="r.id" :value="r.id" class="role-item">
+              <span class="role-name">{{ r.name }}</span>
+              <span class="role-code">{{ r.code }}</span>
+            </el-checkbox>
+          </el-checkbox-group>
+          <div v-if="!roleOptions.length" class="card-hint">该企业还没有角色，请先到「角色管理」创建</div>
+          <div v-else-if="form.roleIds.length > 1" class="card-hint">已选 {{ form.roleIds.length }} 个角色，权限取并集</div>
         </section>
 
         <section class="form-card">
           <h4 class="card-title">
             数据权限
-            <span class="card-tip">{{ isEntAdminRow ? '企业管理员固定为全公司' : '决定能看到谁的数据' }}</span>
+            <span class="card-tip">{{ isEntAdminRow ? '企业管理员固定为全公司' : (form.roleIds.length > 1 ? '独立于角色，请按需选择' : '决定能看到谁的数据') }}</span>
           </h4>
           <div class="scope-cards" :class="{ 'scope-cards--locked': isEntAdminRow }">
             <div
@@ -217,15 +224,18 @@ function rolesOf(row) {
   return arr.map(r => (r && typeof r === 'object' ? r : { id: r })).filter(r => r.id != null)
 }
 
-function initialRoleId(row) {
+// 回显用 roles[]（roleId 只是"第一个角色"的兼容字段，不能用来回显多角色）
+function initialRoleIds(row) {
   const list = rolesOf(row)
-  if (list.length) return Number(list[0].id)
-  return row.roleId == null ? null : Number(row.roleId)
+  if (list.length) return list.map(r => Number(r.id))
+  return row.roleId == null ? [] : [Number(row.roleId)]
 }
 
-function roleNameFor(row) {
-  const list = rolesOf(row)
-  return list.map(r => roleOptions.value.find(o => o.id === Number(r.id))?.name || r.name || '').filter(Boolean).join('、')
+// 列表里展示该成员全部角色名
+function roleTags(row) {
+  return rolesOf(row)
+    .map(r => roleOptions.value.find(o => Number(o.id) === Number(r.id))?.name || r.name || '')
+    .filter(Boolean)
 }
 
 async function loadRoles() {
@@ -240,7 +250,7 @@ async function loadRoles() {
 const editDrawer = ref(false)
 const saving = ref(false)
 const current = ref(null)
-const form = ref({ nickname: '', username: '', deptId: null, dataScope: 'SELF', roleId: null })
+const form = ref({ nickname: '', username: '', deptId: null, dataScope: 'SELF', roleIds: [] })
 
 // 企业管理员的数据权限由后端固定为 ALL，界面上置灰不可改
 const isEntAdminRow = computed(() => Number(current.value?.enterpriseRole || 0) === 1)
@@ -257,7 +267,7 @@ function openEdit(row) {
     username: row.username,
     deptId: row.deptId ?? null,
     dataScope: Number(row.enterpriseRole || 0) === 1 ? 'ALL' : (row.dataScope || 'SELF'),
-    roleId: initialRoleId(row)
+    roleIds: initialRoleIds(row)
   }
   editDrawer.value = true
 }
@@ -265,12 +275,15 @@ function openEdit(row) {
 async function saveEdit() {
   const row = current.value
   // 后端 PUT /users/{id} 是全量覆盖：缺省字段会被置空，所以每次都带全三个字段
+  // roleIds 为数组：[] = 清空角色，不传/null = 不改角色
+  const roleIds = [...(form.value.roleIds || [])].sort((a, b) => a - b)
   const payload = {
     deptId: form.value.deptId || null,
     dataScope: form.value.dataScope,
-    roleIds: form.value.roleId ? [form.value.roleId] : []
+    roleIds
   }
-  const roleChanged = (initialRoleId(row) ?? null) !== (payload.roleIds[0] ?? null)
+  const before = initialRoleIds(row).sort((a, b) => a - b)
+  const roleChanged = before.length !== roleIds.length || before.some((id, idx) => id !== roleIds[idx])
   const changed =
     roleChanged ||
     (row.deptId ?? null) !== (payload.deptId ?? null) ||
@@ -285,8 +298,8 @@ async function saveEdit() {
     // 改的是自己：当前会话的权限立刻刷新，否则菜单要到下次登录才变
     if (String(row.id) === String(userStore.userId)) await perm.load(true)
     if (roleChanged) {
-      const name = payload.roleIds[0] ? roleOptions.value.find(r => r.id === payload.roleIds[0])?.name : ''
-      ElMessage.success(name ? `已分配角色：${name}` : '已清除该成员的角色')
+      const names = roleIds.map(id => roleOptions.value.find(r => Number(r.id) === id)?.name).filter(Boolean)
+      ElMessage.success(names.length ? `已分配角色：${names.join('、')}` : '已清除该成员的角色')
     } else {
       ElMessage.success('已保存')
     }
@@ -298,7 +311,6 @@ async function saveEdit() {
     saving.value = false
   }
 }
-
 function scopeTagType(scope) {
   return { ALL: 'danger', DEPT: 'primary', DEPT_BELOW: 'primary', DEPT_AND_BELOW: 'primary', SELF: 'info' }[
     String(scope || '').toUpperCase()
@@ -313,6 +325,32 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* 角色勾选：一行多个（自适应列宽），字号收小 */
+.role-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.role-item {
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: var(--cs-bg-page);
+  border: 1px solid transparent;
+  transition: background var(--cs-transition), border-color var(--cs-transition);
+}
+.role-item:hover { background: var(--cs-bg-hover); }
+.role-item.is-checked { background: rgba(22, 119, 255, 0.08); border-color: rgba(22, 119, 255, 0.24); }
+.role-item :deep(.el-checkbox) { height: auto; }
+.role-item :deep(.el-checkbox__label) { display: inline-flex; align-items: baseline; gap: 5px; padding-left: 6px; font-size: 12px; }
+.role-name { font-size: 12.5px; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-code { font-size: 10.5px; color: var(--cs-text-tertiary); font-family: Consolas, monospace; }
+.role-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.role-tags :deep(.el-tag) { margin: 0; }
+.card-hint { margin-top: 8px; font-size: 11.5px; color: var(--cs-text-tertiary); line-height: 1.6; }
 .breadcrumb-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
 .page-head-left { display: flex; align-items: baseline; gap: 12px; }
 .page-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .2px; color: var(--cs-text-primary); }
