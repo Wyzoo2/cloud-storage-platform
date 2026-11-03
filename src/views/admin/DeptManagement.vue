@@ -134,10 +134,13 @@
             v-model="form.parentId"
             :options="parentOptions"
             :props="{ checkStrictly: true, emitPath: false, expandTrigger: 'click' }"
-            placeholder="不选 = 顶级部门"
+            placeholder="不选 = 最外层部门"
             clearable
             style="width: 100%"
           />
+          <el-text size="small" type="info" style="width: 100%; margin-top: 4px">
+              不选则作为最外层部门
+          </el-text>
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sortNo" :min="0" :max="9999" controls-position="right" style="width: 100%" />
@@ -194,7 +197,7 @@ const current = computed(() => rows.value.find(n => n.id === currentId.value) ||
 const parentName = computed(() => {
   if (!current.value) return '--'
   const p = rows.value.find(n => n.id === current.value.parentId)
-  return p ? p.name : '顶级部门'
+  return p ? p.name : '--'
 })
 const childCount = computed(() => (current.value ? treeChildrenOf(current.value.id).length : 0))
 
