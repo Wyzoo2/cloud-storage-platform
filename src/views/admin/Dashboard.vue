@@ -14,6 +14,14 @@
         </div>
       </div>
     </div>
+    <div class="stats-hint">
+      <span class="hint-text">
+        口径：个人免费 + 个人增量 + 企业分配给成员的额度（企业池中尚未分配的余量不计入）
+      </span>
+      <el-button v-if="perm.can('org.member.read')" link type="primary" size="small" @click="router.push('/admin/resources')">
+        去「企业资源」查看池余量
+      </el-button>
+    </div>
     <div class="charts-row">
       <div class="cs-card chart-card">
         <h3 class="chart-title">存储用量 Top 10</h3>
@@ -40,10 +48,12 @@ import * as echarts from 'echarts'
 import { useAppStore } from '@/stores/app'
 import { adminApi } from '@/api'
 import { usePermissionStore } from '@/stores/permission'
+import { useRouter } from 'vue-router'
 import { formatSize } from '@/utils/file'
 
 const appStore = useAppStore()
 const perm = usePermissionStore()
+const router = useRouter()
 const topUsersChart = ref(null)
 const trafficChart = ref(null)
 let topChartInstance = null, trafficChartInstance = null
@@ -109,7 +119,10 @@ function initTopUsersChart() {
       trigger: 'axis', axisPointer: { type: 'shadow' },
       formatter: p => {
         const item = sorted[p[0].dataIndex]
-        return `${item.nickname || item.username}<br/>已用: ${formatSize(item.usedBytes)}<br/>配额: ${formatSize(item.quotaBytes)}`
+            const quota = Number(item.quotaBytes || 0)
+    const used = Number(item.usedBytes || 0)
+    const pct = quota > 0 ? Math.round((used / quota) * 1000) / 10 : 0
+    return `${item.nickname || item.username}<br/>已用: ${formatSize(used)}<br/>配额: ${formatSize(quota)}<br/>使用率: ${pct}%`
       }
     },
     grid: { left: 80, right: 30, top: 10, bottom: 20 },
@@ -222,6 +235,8 @@ watch(() => appStore.theme, () => { refreshCharts() })
 </script>
 
 <style scoped>
+.stats-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; }
+.hint-text { font-size: 11.5px; color: var(--cs-text-tertiary); line-height: 1.6; }
 .title-row { display: flex; align-items: center; gap: 10px; }
 .scope-tag { margin-left: 2px; }
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }

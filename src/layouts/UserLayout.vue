@@ -2,8 +2,8 @@
   <div class="layout-user">
     <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': mobileMenuOpen }">
       <div class="sidebar-header">
-        <div class="logo-badge"><img :src="logoUrl" alt="优芽云存储" class="logo-img" /></div>
-        <span v-show="!isCollapsed" class="sidebar-title">优芽云存储</span>
+        <div class="logo-badge"><img :src="logoUrl" alt="云存储" class="logo-img" /></div>
+        <span v-show="!isCollapsed" class="sidebar-title">云存储</span>
       </div>
       <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
         <el-menu-item v-for="m in visibleMenus" :key="m.path" :index="m.path">

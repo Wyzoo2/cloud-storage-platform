@@ -83,7 +83,9 @@ export const uploadApi = {
   // 取消上传：后端自动把任务置为 aborted（幂等，done/aborted 再调无副作用）
   abort: sessionId => request.post(`/uploads/${sessionId}/abort`),
   // 获取 5 分钟预签名下载地址 → { url }
-  getDownloadUrl: fileId => request.get(`/files/${fileId}/download`),
+  // 预签名地址：inline=true 为「预览」（响应头 inline，浏览器可直接渲染），false 为「下载」
+  getDownloadUrl: (fileId, inline = false) =>
+    request.get(`/files/${fileId}/download`, { params: inline ? { inline: true } : undefined }),
 }
 
 // ===== 计费管理（admin）=====

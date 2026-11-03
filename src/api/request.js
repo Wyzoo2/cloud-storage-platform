@@ -34,22 +34,24 @@ const LOGIN_ERRORS = {
 
 // 40301 去重：同一句提示 6 秒内只弹一次（页面初始化时多个接口同时缺权限，避免连弹 4 条）
 const recentTips = new Map()
-function failOnce(message, silent) {
+function failOnce(message, silent, code) {
   const msg = message || '请求失败'
   const now = Date.now()
-  if (now - (recentTips.get(msg) || 0) < 6000) return Promise.reject(new Error(msg))
+  if (now - (recentTips.get(msg) || 0) < 6000) { const e = new Error(msg); if (code != null) e.code = code; return Promise.reject(e) }
   recentTips.set(msg, now)
   if (recentTips.size > 50) recentTips.clear()
-  return fail(msg, silent)
+  return fail(msg, silent, code)
 }
 
 // 登出接口返回 401 属于正常（会话已失效）：不提示"登录已过期"、不刷新令牌、不跳转
 const isLogoutRequest = config => String(config?.url || '').includes('/auth/logout')
 
-function fail(message, silent) {
+function fail(message, silent, code) {
   const msg = message || '请求失败'
   if (!silent) ElMessage.error(msg)
-  return Promise.reject(new Error(msg))
+  const err = new Error(msg)
+  if (code != null) err.code = code
+  return Promise.reject(err)
 }
 
 /** 刷新权限上下文：动态引入避免 store ↔ api 循环依赖 */
@@ -145,22 +147,22 @@ request.interceptors.response.use(
     // 40208 配额不足：按 message 分流引导（个人额度 / 企业套餐 / 企业空间）
     if (code === 40208) {
       const msg = message || '存储额度已满'
-      if (/企业套餐已到期/.test(msg)) return fail(`${msg}（可到「套餐增值」页续费）`, silent)
-      if (/企业空间不足/.test(msg)) return fail(`${msg}（续费套餐或联系管理员调整分配）`, silent)
-      return fail(`${msg}（个人额度不足，可在「增额申请」提交）`, silent)
+      if (/企业套餐已到期/.test(msg)) return fail(`${msg}（可到「套餐增值」页续费）`, silent, code)
+      if (/企业空间不足/.test(msg)) return fail(`${msg}（续费套餐或联系管理员调整分配）`, silent, code)
+      return fail(`${msg}（个人额度不足，可在「增额申请」提交）`, silent, code)
     }
     if (code === 40301) {
       refreshPermissions()
       const msg403 = message || '无权限访问'
-      if (/企业空间已超额/.test(msg403)) return failOnce(`${msg403}（请联系管理员缩减分配或续费套餐）`, silent)
-      return failOnce(msg403, silent)
+      if (/企业空间已超额/.test(msg403)) return failOnce(`${msg403}（请联系管理员缩减分配或续费套餐）`, silent, code)
+      return failOnce(msg403, silent, code)
     }
     // 40400：后端明确"接口不存在"（通常是新功能还没上线），给一句能看懂的话
     if (code === 40400) {
       const url = response.config?.url || ''
       return fail(`接口未上线：${url.startsWith('/') ? url : '/' + url}`, silent)
     }
-    return fail(message, silent)
+    return fail(message, silent, code)
   },
   error => {
     // 用户主动取消（暂停/放弃上传）：静默返回，不弹错误提示

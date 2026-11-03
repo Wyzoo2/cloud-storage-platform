@@ -12,7 +12,7 @@
         <span class="stat-value">{{ overview.userCount ?? '--' }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">总配额</span>
+        <span class="stat-label">成员可用总量</span>
         <span class="stat-value">{{ formatSize(overview.totalQuotaBytes || 0) }}</span>
       </div>
       <div class="stat-card">
@@ -20,7 +20,7 @@
         <span class="stat-value">{{ formatSize(overview.usedBytes || 0) }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-label">剩余空间</span>
+        <span class="stat-label">剩余可用</span>
         <span class="stat-value">{{ formatSize(overview.remainingBytes || 0) }}</span>
       </div>
     </div>

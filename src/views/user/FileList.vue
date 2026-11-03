@@ -475,7 +475,7 @@ async function openPreview(row) {
 async function loadUrlPreview(row) {
   previewLoading.value = true
   try {
-    const { url } = await uploadApi.getDownloadUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id, true)
     previewUrl.value = url
   } catch (e) {
     previewVisible.value = false
@@ -488,7 +488,7 @@ async function loadUrlPreview(row) {
 async function loadTextPreview(row) {
   previewLoading.value = true
   try {
-    const { url } = await uploadApi.getDownloadUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id, true)
     const resp = await fetch(url)
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     previewText.value = await resp.text()
@@ -518,7 +518,7 @@ async function previewOffice(row) {
       previewVisible.value = false
       return
     }
-    const { url } = await uploadApi.getDownloadUrl(row.id)
+    const { url } = await uploadApi.getDownloadUrl(row.id, true)
     const resp = await fetch(url)
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     const container = officeContainer.value

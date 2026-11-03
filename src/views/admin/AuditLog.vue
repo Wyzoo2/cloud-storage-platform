@@ -27,7 +27,7 @@
           <el-option-group label="计费操作">
             <el-option label="增额申请" value="billing_request" /><el-option label="审批通过" value="billing_approve" />
             <el-option label="审批驳回" value="billing_reject" /><el-option label="增量到期收回" value="billing_expire" />
-            <el-option label="计费配置变更" value="billing_config" />
+            <el-option label="计费配置变更" value="billing_config" /><el-option label="购买套餐" value="billing_order" /><el-option label="套餐续费" value="billing_renew" />
           </el-option-group>
           <el-option-group label="管理操作">
             <el-option label="用户管理操作" value="user_manage" /><el-option label="用户降级" value="user_demote" /><el-option label="配额变更" value="quota_change" />
@@ -64,6 +64,13 @@
         </el-table-column>
         <el-table-column prop="action" label="动作" width="140">
           <template #default="{ row }"><el-tag size="small" :type="actionTagType(row.action)">{{ actionLabel(row.action) }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="金额 / 说明" width="190">
+          <template #default="{ row }">
+            <span v-if="amountText(row)">{{ amountText(row) }}</span>
+            <span v-else class="muted">--</span>
+            <el-tag v-if="isDuplicated(row)" size="small" type="info" effect="plain" class="dup-tag">未扣款</el-tag>
+          </template>
         </el-table-column>
         <el-table-column prop="target" label="目标" min-width="200">
           <template #default="{ row }">{{ targetLabel(row) }}</template>
@@ -139,7 +146,37 @@ function handleSizeChange() { currentPage.value = 1; loadLogs() }
 function handleReset() { filters.value = { userId: null, action: '', dateRange: null }; currentPage.value = 1; loadLogs() }
 
 // 后端实际动作值为小写（login / mkdir / user_manage 等），未收录的显示原文
-const actionMap = { login: '登录', logout: '登出', upload: '上传', download: '下载', delete: '删除', restore: '恢复', mkdir: '新建文件夹', create_folder: '新建文件夹', rename: '重命名', move: '移动', share: '分享', user_manage: '用户管理', billing_request: '增额申请', billing_approve: '审批通过', billing_reject: '审批驳回', billing_expire: '增量到期收回', billing_config: '计费配置变更', user_demote: '用户降级', quota_change: '配额变更', delete_force: '强制删除' }
+const actionMap = { login: '登录', logout: '登出', upload: '上传', download: '下载', delete: '删除', restore: '恢复', mkdir: '新建文件夹', create_folder: '新建文件夹', rename: '重命名', move: '移动', share: '分享', user_manage: '用户管理', billing_request: '增额申请', billing_approve: '审批通过', billing_reject: '审批驳回', billing_expire: '增量到期收回', billing_config: '计费配置变更', billing_order: '购买套餐', billing_renew: '套餐续费', user_demote: '用户降级', quota_change: '配额变更', delete_force: '强制删除' }
+// detail 可能是 JSON 字符串或对象，统一解析成对象
+function detailObj(row) {
+  const d = row?.detail
+  if (!d) return {}
+  if (typeof d === 'object') return d
+  try { return JSON.parse(d) } catch { return {} }
+}
+
+// 购买 / 续费的金额与说明（金额单位：分）
+function amountText(row) {
+  const a = String(row?.action || '').toLowerCase()
+  const d = detailObj(row)
+  if (a === 'billing_order') {
+    const yuan = d.totalCents != null ? (Number(d.totalCents) / 100).toFixed(2) : ''
+    const qty = d.quantity != null ? ` × ${d.quantity}` : ''
+    return yuan ? `¥${yuan}${qty}` : ''
+  }
+  if (a === 'billing_renew') {
+    const yuan = d.priceCents != null ? (Number(d.priceCents) / 100).toFixed(2) : ''
+    const ext = d.extendDays != null ? ` · 延长 ${d.extendDays} 天` : ''
+    return (yuan ? `¥${yuan}` : '') + ext
+  }
+  return ''
+}
+
+// 重复提交（未扣款）标记
+function isDuplicated(row) {
+  return !!detailObj(row).duplicated
+}
+
 function actionLabel(a) { return actionMap[String(a || '').toLowerCase()] || a }
 function actionTagType(a) { const k = String(a || '').toLowerCase(); if (!k) return 'info'; if (k === 'user_manage' || k === 'billing_config' || k === 'quota_change') return 'warning'; if (['delete', 'logout', 'billing_expire'].includes(k)) return 'info'; if (k === 'login' || k === 'billing_approve') return 'success'; if (k === 'billing_reject' || k === 'user_demote' || k === 'delete_force') return 'danger'; return 'info' }
 // detail 是 JSON 字符串，格式化后展示；target 优先取 detail 里的 name（如目录名）
@@ -153,6 +190,10 @@ function detailText(row) {
 }
 function targetLabel(row) {
   const d = parseDetail(row)
+  const a = String(row?.action || '').toLowerCase()
+  // 计费动作的 target 是订单号 / 开通记录号，补可读前缀
+  if (a === 'billing_order' && row.target) return `订单 #${row.target}`
+  if (a === 'billing_renew' && row.target) return `套餐 #${row.target}`
   return row.targetName || d?.name || row.target || '--'
 }
 
@@ -162,6 +203,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.dup-tag { margin-left: 6px; transform: scale(.92); }
+.muted { color: var(--cs-text-tertiary); }
 .page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }
 .expand-detail { padding: 16px 24px; }
 .expand-detail h4 { font-size: 14px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 12px 0; }

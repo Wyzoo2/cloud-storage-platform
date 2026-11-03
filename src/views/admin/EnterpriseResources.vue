@@ -112,14 +112,19 @@
         </div>
       </div>
       <el-table v-if="subscriptions.length" :data="subscriptions" size="small" style="width: 100%" row-key="orderItemId" :row-class-name="expiringRowClass">
-        <el-table-column label="套餐" min-width="180">
+        <el-table-column label="套餐" min-width="200">
           <template #default="{ row }">
-            <span :class="{ 'row-muted': subEnded(row) }">{{ row.skuName || row.skuId || '--' }}</span>
+            <div class="sub-name" :class="{ 'row-muted': subEnded(row) }">{{ row.skuName || row.skuId || '--' }}</div>
+            <div class="sub-sub">
+              {{ row.createdAt ? '开通 ' + formatDate(row.createdAt) : '' }}
+              <span v-if="row.renewals"> · 已续费 {{ row.renewals }} 次</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="容量" width="110" align="right">
+        <el-table-column label="容量" min-width="190">
           <template #default="{ row }">
-            <span :class="{ 'row-muted': subEnded(row) }">{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).num }}{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).unit }}</span>
+            <div class="sub-name" :class="{ 'row-muted': subEnded(row) }">{{ quotaBreakdown(row) }}</div>
+            <div class="sub-sub" v-if="row.totalPriceCents != null">总价 ¥{{ (Number(row.totalPriceCents) / 100).toFixed(2) }}</div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -128,7 +133,7 @@
             <el-tag v-else size="small" :type="subStateOf(row).type" effect="plain">{{ subStateOf(row).text }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="到期" min-width="220">
+        <el-table-column label="到期" min-width="200">
           <template #default="{ row }">
             <span class="sub-date">
               {{ row.expireAt ? formatDate(row.expireAt) : '--' }}
@@ -183,6 +188,9 @@
       v-model="confirmVisible"
       kind="renew"
       :quantity="confirmQty"
+      :expire-at-before="confirmExpireBefore"
+      :expire-at-after="confirmExpireAfter"
+      :extend-days="confirmExtendDays"
       :item="confirmItem"
       :wallet-known="billing.walletState === 'ok'"
       :balance-cents="Number(billing.wallet.balanceCents || 0)"
@@ -235,11 +243,17 @@ const gb = ref(0)
 const confirmVisible = ref(false)
 const confirmItem = ref({})
 const confirmQty = ref(1)
+const confirmExpireBefore = ref('')
+const confirmExpireAfter = ref('')
+const confirmExtendDays = ref(0)
 const pendingOrder = ref(null)
 
 function askConfirm(title, item, payload, opts = {}) {
   confirmItem.value = item
   confirmQty.value = Number(opts.quantity || 1)
+  confirmExpireBefore.value = opts.expireAtBefore || ''
+  confirmExpireAfter.value = opts.expireAtAfter || ''
+  confirmExtendDays.value = Number(opts.extendDays || 0)
   pendingOrder.value = payload
   confirmVisible.value = true
 }
@@ -283,12 +297,38 @@ const maxGb = computed(() => {
 })
 
 // 已回收的套餐不可续费（需重新购买）
+// 续费节流：后端 3 秒内只允许一次，命中后前端倒计时禁用按钮
+const renewCooldown = ref(0)
+let renewCooldownTimer = null
+function startRenewCooldown(seconds = 3) {
+  renewCooldown.value = Math.max(1, Number(seconds) || 3)
+  if (renewCooldownTimer) clearInterval(renewCooldownTimer)
+  renewCooldownTimer = setInterval(() => {
+    renewCooldown.value -= 1
+    if (renewCooldown.value <= 0) { clearInterval(renewCooldownTimer); renewCooldownTimer = null; renewCooldown.value = 0 }
+  }, 1000)
+}
+onBeforeUnmount(() => { if (renewCooldownTimer) clearInterval(renewCooldownTimer) })
+
 function canRenew(row) {
+  if (renewCooldown.value > 0) return false
   return row?.status !== 'reclaimed'
 }
 
 function renewTip(row) {
+  if (renewCooldown.value > 0) return `请 ${renewCooldown.value} 秒后再试`
   return row?.status === 'reclaimed' ? '该套餐已回收，无法续费，请重新购买' : ''
+}
+
+// 容量三段式：数量 × 单份 = 总量（文档要求）
+function quotaBreakdown(row) {
+  const qty = Number(row.quantity || 1)
+  const unit = Number(row.unitQuotaGb ?? row.quotaGb ?? 0)
+  const total = Number(row.totalQuotaGb ?? unit * qty)
+  const totalText = `${fmtQuota(total).num}${fmtQuota(total).unit}`
+  if (!unit) return totalText
+  const unitText = `${fmtQuota(unit).num}${fmtQuota(unit).unit}`
+  return qty > 1 ? `${qty} × ${unitText} = ${totalText}` : unitText
 }
 
 // 7 天内到期（含按小时显示）→ 整行淡红底 + 状态「即将到期」
@@ -384,25 +424,48 @@ async function loadSubscriptions() {
 // 续费：先弹确认（价格取订阅行的 totalPriceCents/priceCents），确认后调 /billing/subscriptions/{id}/renew
 // 该接口一步完成（后端已建门户订单并延期），返回 portalOrderId 用于轮询开通结果
 async function renew(row) {
-  // 已回收的套餐后端不再提供续费，前端直接拦住
+  // 已回收的套餐不可续费（需重新购买）
   if (row?.status === 'reclaimed') return ElMessage.warning('该套餐已回收，无法续费，请重新购买')
   if (!billing.walletState || billing.walletState === 'idle') await billing.loadWallet()
-  const quotaGb = row.totalQuotaGb ?? row.unitQuotaGb ?? null
   const qty = Number(row.quantity || 1)
+  const totalQuotaGb = Number(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb ?? 0)
   const totalCents = Number(row.totalPriceCents ?? row.priceCents ?? 0)
+  const days = Number(row.periodDays || row.extendDays || 30)
   askConfirm(
     `续费 · ${row.skuName || row.skuId || ''}`,
     {
       name: row.skuName || row.skuId,
-      unitQuotaGb: qty > 0 ? Number(quotaGb || 0) / qty : quotaGb,
-      periodDays: row.periodDays,
+      unitQuotaGb: qty > 0 ? totalQuotaGb / qty : totalQuotaGb,
+      periodDays: days,
       unitPriceCents: qty > 0 ? Math.round(totalCents / qty) : totalCents
     },
-    { orderItemId: row.orderItemId, quotaGb },
-    { quantity: qty }
+    { orderItemId: row.orderItemId, quotaGb: totalQuotaGb },
+    {
+      quantity: qty,
+      expireAtBefore: row.expireAt || '',
+      expireAtAfter: addDaysIso(row.expireAt, days),
+      extendDays: days
+    }
   )
 }
 
+function addDaysIso(iso, days) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  d.setDate(d.getDate() + Number(days || 0))
+  return d.toISOString()
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '--'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '--'
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 续费只调一个接口（延长旧开通，容量不变）；重复点击当天不再扣款
 async function runRenew(payload) {
   renewing.value = payload.orderItemId
   openProvision(`续费 · ${confirmItem.value?.name || ''}`)
@@ -410,22 +473,44 @@ async function runRenew(payload) {
   try {
     const r = await enterpriseApi.renewSubscription(payload.orderItemId)
     if (r?.pool) pool.value = r.pool
-    setProvision('running', 60, '开通中…')
-    const orderId = r?.portalOrderId ?? r?.orderId ?? null
-    if (orderId) {
-      const result = await pollProvision(orderId, {
-        onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
-      })
-      if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效')
-      else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
-      else setProvision('done', 100, '续费已完成', '开通状态仍需门户确认，可稍后刷新查看。')
+    if (r?.duplicated) {
+      setProvision('done', 100, '重复提交，本次未扣款', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
     } else {
-      setProvision('done', 100, '续费成功，套餐已生效')
+      setProvision('running', 60, '开通中…')
+      const orderId = r?.portalOrderId ?? r?.orderId ?? null
+      if (orderId) {
+        const result = await pollProvision(orderId, {
+          onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
+        })
+        if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+        else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
+        else setProvision('done', 100, '续费已完成', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
+      } else {
+        setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+      }
     }
-    await Promise.all([loadPool(), loadSubscriptions(), billing.loadWallet()])
+    await Promise.all([loadPool(), loadSubscriptions()])
     await perm.load(true)
   } catch (e) {
-    setProvision('failed', 100, '续费失败', e?.message || '')
+    const msg = String(e?.message || '')
+    // 续费节流（默认 3 秒）：不扣款、不延长，前端倒计时后再允许点击
+    if (msg.includes('操作过于频繁')) {
+      const sec = Number((msg.match(/(\d+)\s*秒/) || [])[1] || 3)
+      startRenewCooldown(sec)
+      setProvision('failed', 100, '操作过于频繁', `请 ${sec} 秒后再试（本次未扣款）`)
+      return
+    }
+    if (msg.includes('已扣款但续费写入失败')) {
+      setProvision('failed', 100, '续费未完成（费用已扣除）', '点击「重试」不会重复扣款')
+      const retry = await ElMessageBox.confirm(
+        '费用已扣除，但到期时间未更新。点击「重试」会复用同一笔幂等键，不会重复扣款。',
+        '续费未完成',
+        { confirmButtonText: '重试', cancelButtonText: '稍后处理', type: 'warning' }
+      ).catch(() => false)
+      if (retry) return runRenew(payload)
+      return
+    }
+    setProvision('failed', 100, '续费失败', msg)
   } finally {
     renewing.value = 0
     // 续费成功或失败都重新拉一次余额，顶栏立即同步
@@ -499,6 +584,8 @@ onMounted(refreshAll)
 </script>
 
 <style scoped>
+.sub-name { font-size: 13px; color: var(--cs-text-primary); }
+.sub-sub { margin-top: 2px; font-size: 11px; color: var(--cs-text-tertiary); }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .page-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 600; color: var(--cs-text-primary); }
 

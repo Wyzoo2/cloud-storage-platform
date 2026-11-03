@@ -30,6 +30,7 @@
           <span v-if="item.periodDays" class="dot">·</span>
           <span>{{ kind === 'renew' ? '到期后顺延' : '即时到账' }}</span>
         </div>
+        <div v-if="expireText" class="oc-expire">{{ expireText }}</div>
         <div class="oc-qty">
           <span class="oc-qty-label">购买数量</span>
           <el-input-number
@@ -43,6 +44,7 @@
             @update:model-value="onQtyChange"
           />
           <span v-else class="oc-qty-readonly">× {{ quantity }}</span>
+          <span v-if="editableQty" class="oc-qty-limit">单次最多 {{ maxQty }} 份</span>
           <span v-if="totalQuotaText" class="oc-qty-total">合计 {{ totalQuotaText }}{{ totalQuotaUnit }}</span>
         </div>
       </div>
@@ -107,7 +109,11 @@ const props = defineProps({
   // 数量：购买时可改，续费由后端固定
   quantity: { type: Number, default: 1 },
   editableQty: { type: Boolean, default: false },
-  maxQty: { type: Number, default: 1000 },
+  maxQty: { type: Number, default: 10 },
+  // 续费：原到期时间与延长天数（用于展示「到期 X → Y（+N 天）」）
+  expireAtBefore: { type: String, default: '' },
+  expireAtAfter: { type: String, default: '' },
+  extendDays: { type: Number, default: 0 },
   // 钱包状态：known=false 表示查不到（本地账号/门户不可用），此时不拦支付
   walletKnown: { type: Boolean, default: false },
   balanceCents: { type: Number, default: 0 },
@@ -144,6 +150,25 @@ const totalQuotaText = computed(() => {
 })
 const totalQuotaUnit = computed(() => splitGb(props.item?.unitQuotaGb).unit)
 
+// 续费展示：到期 2026-11-29 → 2026-12-29（+30 天）
+const expireText = computed(() => {
+  const before = props.expireAtBefore
+  const after = props.expireAtAfter
+  const days = Number(props.extendDays || 0)
+  if (!before && !after) return ''
+  const fmt = v => {
+    if (!v) return '--'
+    const d = new Date(v)
+    if (isNaN(d.getTime())) return '--'
+    const pad = n => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  const tail = days > 0 ? `（+${days} 天）` : ''
+  if (before && after) return `到期 ${fmt(before)} → ${fmt(after)}${tail}`
+  if (after) return `续费后到期 ${fmt(after)}${tail}`
+  return `当前到期 ${fmt(before)}${tail}`
+})
+
 const balanceText = computed(() => {
   if (!props.walletKnown) return '暂不可查'
   return `¥${props.balanceYuan || (props.balanceCents / 100).toFixed(2)}`
@@ -179,12 +204,15 @@ function onQtyChange(v) {
 .oc-goods-meta .dot { margin: 0 6px; opacity: .6; }
 .oc-goods-meta .strong { color: var(--cs-text-secondary); font-weight: 600; font-variant-numeric: tabular-nums; }
 
+.oc-expire { margin-top: 10px; padding: 7px 10px; border-radius: 6px; background: rgba(22,119,255,.06);
+  font-size: 11.5px; color: var(--cs-text-secondary); font-variant-numeric: tabular-nums; line-height: 1.6; }
 .oc-qty { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px;
   border-top: 1px dashed var(--cs-border); }
 .oc-qty-label { font-size: 12.5px; color: var(--cs-text-secondary); }
 .oc-qty-input { width: 108px; }
 .oc-qty-readonly { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
-.oc-qty-total { margin-left: auto; font-size: 11.5px; color: var(--cs-text-tertiary); font-variant-numeric: tabular-nums; }
+.oc-qty-limit { margin-left: auto; font-size: 11px; color: var(--cs-text-tertiary); }
+.oc-qty-total { font-size: 11.5px; color: var(--cs-text-tertiary); font-variant-numeric: tabular-nums; }
 
 .oc-amount { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
   padding: 0 2px 12px; border-bottom: 1px dashed var(--cs-border); }

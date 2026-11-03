@@ -82,14 +82,19 @@
         </div>
       </div>
       <el-table v-if="subscriptions.length" :data="subscriptions" size="small" style="width: 100%" row-key="orderItemId" :row-class-name="expiringRowClass">
-        <el-table-column label="套餐" min-width="180">
+        <el-table-column label="套餐" min-width="200">
           <template #default="{ row }">
-            <span :class="{ 'row-muted': expired(row) }">{{ row.skuName || row.skuId || '--' }}</span>
+            <div class="sub-name" :class="{ 'row-muted': expired(row) }">{{ row.skuName || row.skuId || '--' }}</div>
+            <div class="sub-sub">
+              {{ row.createdAt ? '开通 ' + formatDate(row.createdAt) : '' }}
+              <span v-if="row.renewals"> · 已续费 {{ row.renewals }} 次</span>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="容量" width="110" align="right">
+        <el-table-column label="容量" min-width="190">
           <template #default="{ row }">
-            <span :class="{ 'row-muted': expired(row) }">{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).num }}{{ fmtQuota(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb).unit }}</span>
+            <div class="sub-name" :class="{ 'row-muted': expired(row) }">{{ quotaBreakdown(row) }}</div>
+            <div class="sub-sub" v-if="row.totalPriceCents != null">总价 ¥{{ (Number(row.totalPriceCents) / 100).toFixed(2) }}</div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -100,7 +105,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="到期" min-width="220">
+        <el-table-column label="到期" min-width="200">
           <template #default="{ row }">
             <span class="sub-date">
               {{ row.expireAt ? formatDate(row.expireAt) : '--' }}
@@ -126,7 +131,10 @@
     <OrderConfirmDialog
       v-model:quantity="confirmQty"
       :editable-qty="confirmEditableQty"
-      :max-qty="1000"
+      :expire-at-before="confirmExpireBefore"
+      :expire-at-after="confirmExpireAfter"
+      :extend-days="confirmExtendDays"
+      :max-qty="confirmMaxQty"
       v-model="confirmVisible"
       :kind="confirmKind"
       :item="confirmItem"
@@ -149,8 +157,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Goods, Refresh } from '@element-plus/icons-vue'
 import { billingApi, enterpriseApi, orderApi } from '@/api'
 import OrderConfirmDialog from '@/components/OrderConfirmDialog.vue'
@@ -162,6 +170,8 @@ import { formatDate, formatRemain, remainMs } from '@/utils/file'
 
 const perm = usePermissionStore()
 const canSeeSubs = computed(() => perm.can('org.member.manage'))
+// 单次最多购买 10 份（产品限制，后端 quantity 上限 1000，这里按业务口径收窄）
+const MAX_QTY = 10
 const loading = ref(false)
 const buying = ref('')
 const renewing = ref(0)
@@ -200,6 +210,10 @@ const confirmKind = ref('buy')
 const pendingOrder = ref(null) // 确认后要提交的下单参数
 const confirmQty = ref(1)      // 购买数量（续费由后端固定）
 const confirmEditableQty = ref(false)
+const confirmMaxQty = ref(10)
+const confirmExpireBefore = ref('')
+const confirmExpireAfter = ref('')
+const confirmExtendDays = ref(0)
 
 function askConfirm(title, item, payload, opts = {}) {
   confirmTitle.value = title
@@ -207,6 +221,7 @@ function askConfirm(title, item, payload, opts = {}) {
   confirmKind.value = payload?.orderItemId ? 'renew' : 'buy'
   confirmQty.value = Number(opts.quantity || item.quantity || 1)
   confirmEditableQty.value = !!opts.editableQty
+  confirmMaxQty.value = Number(opts.maxQty || 10)
   pendingOrder.value = payload
   confirmVisible.value = true
 }
@@ -227,7 +242,7 @@ function onConfirmed() {
   pendingOrder.value = null
   // 续费走一步式 /billing/subscriptions/{id}/renew，购买走 POST /orders
   if (payload.orderItemId) runRenew(payload)
-  else runOrder(confirmTitle.value, { ...payload, quantity: confirmQty.value })
+  else runOrder(confirmTitle.value, { ...payload, quantity: Math.min(MAX_QTY, Math.max(1, Number(confirmQty.value) || 1)) })
 }
 
 /* ---------------- 开通进度弹窗：开通结束前不可关闭 ---------------- */
@@ -255,11 +270,26 @@ function setProvision(state, percent, step, detail = '') {
 }
 
 // 已回收的套餐不可续费（需重新购买）；账号不可购买时也不可续费
+// 续费节流：后端 3 秒内只允许一次，命中后前端倒计时禁用按钮
+const renewCooldown = ref(0)
+let renewCooldownTimer = null
+function startRenewCooldown(seconds = 3) {
+  renewCooldown.value = Math.max(1, Number(seconds) || 3)
+  if (renewCooldownTimer) clearInterval(renewCooldownTimer)
+  renewCooldownTimer = setInterval(() => {
+    renewCooldown.value -= 1
+    if (renewCooldown.value <= 0) { clearInterval(renewCooldownTimer); renewCooldownTimer = null; renewCooldown.value = 0 }
+  }, 1000)
+}
+onBeforeUnmount(() => { if (renewCooldownTimer) clearInterval(renewCooldownTimer) })
+
 function canRenew(row) {
+  if (renewCooldown.value > 0) return false
   return !!packages.value.canPurchase && row?.status !== 'reclaimed'
 }
 
 function renewTip(row) {
+  if (renewCooldown.value > 0) return `请 ${renewCooldown.value} 秒后再试`
   if (row?.status === 'reclaimed') return '该套餐已回收，无法续费，请重新购买'
   if (!packages.value.canPurchase) return packages.value.denyReason || '当前账号不可购买'
   return ''
@@ -270,6 +300,17 @@ function canBuy(p) {
 }
 
 // 7 天内到期（含剩不到 1 天、按小时显示的情况）→ 整行淡红底 + 状态「即将到期」
+// 容量三段式：数量 × 单份 = 总量（文档要求）
+function quotaBreakdown(row) {
+  const qty = Number(row.quantity || 1)
+  const unit = Number(row.unitQuotaGb ?? row.quotaGb ?? 0)
+  const total = Number(row.totalQuotaGb ?? unit * qty)
+  const totalText = `${fmtQuota(total).num}${fmtQuota(total).unit}`
+  if (!unit) return totalText
+  const unitText = `${fmtQuota(unit).num}${fmtQuota(unit).unit}`
+  return qty > 1 ? `${qty} × ${unitText} = ${totalText}` : unitText
+}
+
 const EXPIRING_MS = 7 * 24 * 3600 * 1000
 function isExpiring(row) {
   if (expired(row)) return false
@@ -325,12 +366,30 @@ async function refreshAll() {
   }
 }
 
+// 下单：仅对 50000（依赖服务不可用）重试 3 次，复用同一 clientOrderKey
+async function createOrderWithRetry(payload) {
+  let lastErr = null
+  for (let i = 0; i < 3; i++) {
+    try {
+      return await orderApi.create(payload)
+    } catch (e) {
+      lastErr = e
+      if (Number(e?.code) !== 50000) throw e
+      setProvision('running', 20 + i * 5, `提交订单…（第 ${i + 1} 次重试）`)
+      await new Promise(r => setTimeout(r, 1000))
+    }
+  }
+  throw lastErr
+}
+
 // 下单 → 轮询开通，全过程在弹窗里展示，结束前不允许关闭
 async function runOrder(title, payload) {
   openProvision(title)
   setProvision('running', 20, '提交订单…')
   try {
-    const order = await orderApi.create(payload)
+    // 下单幂等键在点击时就已生成（payload.clientOrderKey），重试复用同一把键；
+    // 只有系统类错误（50000 依赖服务不可用）才重试，业务错误直接抛给上层
+    const order = await createOrderWithRetry(payload)
     const orderId = orderIdOf(order)
     if (!orderId) {
       setProvision('timeout', 80, '订单已提交，开通结果待确认', '请稍后刷新查看，或到门户核对订单状态。')
@@ -360,7 +419,7 @@ async function buy(p) {
     `购买 · ${p.name}`,
     { name: p.name, unitQuotaGb: p.quotaGb, periodDays: p.periodDays, unitPriceCents: p.priceCents },
     { skuId: p.skuId, clientOrderKey: makeOrderKey(p.skuId) },
-    { editableQty: true, quantity: 1 }
+    { editableQty: true, quantity: 1, maxQty: MAX_QTY }
   )
 }
 async function renew(row) {
@@ -370,39 +429,90 @@ async function renew(row) {
   const qty = Number(row.quantity || 1)
   const totalQuotaGb = Number(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb ?? 0)
   const totalCents = Number(row.totalPriceCents ?? row.priceCents ?? 0)
+  const days = Number(row.periodDays || row.extendDays || 30)
+  const before = row.expireAt || ''
+  // 续费确认弹窗必须写清：金额、延长天数、新旧到期时间（文档 §2.4）
   askConfirm(
     `续费 · ${row.skuName || row.skuId || ''}`,
     {
       name: row.skuName || row.skuId,
       unitQuotaGb: qty > 0 ? totalQuotaGb / qty : totalQuotaGb,
-      periodDays: row.periodDays || row.extendDays,
+      periodDays: days,
       unitPriceCents: qty > 0 ? Math.round(totalCents / qty) : totalCents
     },
     { orderItemId: row.orderItemId },
-    { editableQty: false, quantity: qty }
+    {
+      editableQty: false,
+      quantity: qty,
+      expireAtBefore: before,
+      expireAtAfter: addDaysIso(before, days),
+      extendDays: days
+    }
   )
 }
+
+function fmtDateTime(iso) {
+  if (!iso) return '--'
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return '--'
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// 在 ISO 时间上加 N 天（仅用于确认弹窗展示，真实值以后端返回为准）
+function addDaysIso(iso, days) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  d.setDate(d.getDate() + Number(days || 0))
+  return d.toISOString()
+}
+
 async function runRenew(payload) {
   renewing.value = payload.orderItemId
   openProvision(`续费 · ${confirmItem.value?.name || ''}`)
   setProvision('running', 25, '提交续费…')
   try {
+    // 续费只调一个接口（不再走 /orders），后端直接延长旧开通
     const r = await enterpriseApi.renewSubscription(payload.orderItemId)
-    setProvision('running', 60, '开通中…')
-    const orderId = r?.portalOrderId ?? r?.orderId ?? null
-    if (orderId) {
-      const result = await pollProvision(orderId, {
-        onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
-      })
-      if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效')
-      else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
-      else setProvision('done', 100, '续费已完成', '开通状态仍需门户确认，可稍后刷新查看。')
+    if (r?.duplicated) {
+      setProvision('done', 100, '重复提交，本次未扣款', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
     } else {
-      setProvision('done', 100, '续费成功，套餐已生效')
+      setProvision('running', 60, '开通中…')
+      const orderId = r?.portalOrderId ?? r?.orderId ?? null
+      if (orderId) {
+        const result = await pollProvision(orderId, {
+          onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
+        })
+        if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+        else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
+        else setProvision('done', 100, '续费已完成', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
+      } else {
+        setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+      }
     }
     await Promise.all([loadPackages(), loadSubscriptions()])
   } catch (e) {
-    setProvision('failed', 100, '续费失败', e?.message || '')
+    const msg = String(e?.message || '')
+    // 续费节流（默认 3 秒）：不扣款、不延长，前端倒计时后再允许点击
+    if (msg.includes('操作过于频繁')) {
+      const sec = Number((msg.match(/(\d+)\s*秒/) || [])[1] || 3)
+      startRenewCooldown(sec)
+      setProvision('failed', 100, '操作过于频繁', `请 ${sec} 秒后再试（本次未扣款）`)
+      return
+    }
+    // 已扣款但写入失败：引导用户重试同一笔（重试复用幂等键，不会重复扣款）
+    if (msg.includes('已扣款但续费写入失败')) {
+      setProvision('failed', 100, '续费未完成（费用已扣除）', '点击下方「重试」不会重复扣款')
+      const retry = await ElMessageBox.confirm(
+        '费用已扣除，但到期时间未更新。点击「重试」会复用同一笔幂等键，不会重复扣款。',
+        '续费未完成',
+        { confirmButtonText: '重试', cancelButtonText: '稍后处理', type: 'warning' }
+      ).catch(() => false)
+      if (retry) return runRenew(payload)
+      return
+    }
+    setProvision('failed', 100, '续费失败', msg)
   } finally {
     renewing.value = 0
     // 成功或失败都刷新一次余额，顶栏立即同步
@@ -413,6 +523,8 @@ onMounted(refreshAll)
 </script>
 
 <style scoped>
+.sub-name { font-size: 13px; color: var(--cs-text-primary); }
+.sub-sub { margin-top: 2px; font-size: 11px; color: var(--cs-text-tertiary); }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .page-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 17px; font-weight: 600; color: var(--cs-text-primary); }
 

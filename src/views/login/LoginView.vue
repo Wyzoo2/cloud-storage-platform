@@ -3,9 +3,9 @@
     <!-- 左侧：品牌与产品介绍（沿用原内容与主题色） -->
     <section class="login-brand">
       <header class="brand-head">
-        <div class="brand-icon"><img :src="logoUrl" alt="优芽云存储" class="brand-logo" /></div>
+        <div class="brand-icon"><img :src="logoUrl" alt="云存储" class="brand-logo" /></div>
         <div class="brand-name-box">
-          <div class="brand-name">优芽云存储</div>
+          <div class="brand-name">云存储</div>
           <div class="brand-en">CLOUD STORAGE PLATFORM</div>
         </div>
       </header>
@@ -99,7 +99,7 @@
         </el-form>
 
         <p class="login-tip">账号由管理员开通 · 忘记密码请联系管理员</p>
-        <div class="login-footer"><span class="footer-text">© 2026 优芽云存储 · 私有化部署方案</span></div>
+        <div class="login-footer"><span class="footer-text">© 2026 云存储 · 私有化部署方案</span></div>
       </div>
     </aside>
   </div>
