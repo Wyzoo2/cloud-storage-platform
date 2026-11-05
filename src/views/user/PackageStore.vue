@@ -81,6 +81,10 @@
           </template>
         </div>
       </div>
+      <div v-if="subsDenied" class="subs-denied">
+        <el-icon><InfoFilled /></el-icon>
+        <span>{{ subsDenied }}</span>
+      </div>
       <el-table v-if="subscriptions.length" :data="subscriptions" size="small" style="width: 100%" row-key="orderItemId" :row-class-name="expiringRowClass">
         <el-table-column label="套餐" min-width="200">
           <template #default="{ row }">
@@ -94,14 +98,14 @@
         <el-table-column label="容量" min-width="190">
           <template #default="{ row }">
             <div class="sub-name" :class="{ 'row-muted': expired(row) }">{{ quotaBreakdown(row) }}</div>
-            <div class="sub-sub" v-if="row.totalPriceCents != null">总价 ¥{{ (Number(row.totalPriceCents) / 100).toFixed(2) }}</div>
+            <div class="sub-sub" v-if="totalCentsOf(row) > 0">总价 ¥{{ (totalCentsOf(row) / 100).toFixed(2) }}</div>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag v-if="isExpiring(row)" size="small" type="danger" effect="plain">即将到期</el-tag>
-            <el-tag v-else size="small" :type="expired(row) ? 'info' : 'success'" effect="plain">
-              {{ expired(row) ? (row.status === 'reclaimed' ? '已回收' : '已到期') : '有效' }}
+            <el-tag v-else size="small" :type="subState(row).type" effect="plain">
+              {{ subState(row).text }}
             </el-tag>
           </template>
         </el-table-column>
@@ -112,6 +116,7 @@
               <span v-if="!expired(row)" class="remain" :class="{ soon: isExpiring(row) }">
                 · {{ formatRemain(row.expireAt) }}
               </span>
+              <span v-else-if="canRenew(row)" class="remain soon">· 已过期，续费后从今天起算一个周期</span>
             </span>
           </template>
         </el-table-column>
@@ -169,7 +174,10 @@ import { useBillingStore } from '@/stores/billing'
 import { formatDate, formatRemain, remainMs } from '@/utils/file'
 
 const perm = usePermissionStore()
-const canSeeSubs = computed(() => perm.can('org.member.manage'))
+// 个人域（普通用户）可管理并续费自己的套餐；企业域仍只有企业管理员可见
+const canSeeSubs = computed(() => perm.identity === 'personal' || perm.can('org.member.manage'))
+// 后端拒绝时的提示（无权限 / 个人域接口未上线）
+const subsDenied = ref('')
 // 单次最多购买 10 份（产品限制，后端 quantity 上限 1000，这里按业务口径收窄）
 const MAX_QTY = 10
 const loading = ref(false)
@@ -284,13 +292,20 @@ function startRenewCooldown(seconds = 3) {
 
 function canRenew(row) {
   if (renewCooldown.value > 0) return false
-  return !!packages.value.canPurchase && row?.status !== 'reclaimed'
+  const st = String(row?.status || '').toLowerCase()
+  if (st === 'reclaimed' || st === 'failed') return false   // 已回收 / 开通失败：只能重新购买
+  if (perm.identity === 'personal') return true             // 普通用户：自己的套餐可续费
+  return !!packages.value.canPurchase                       // 企业域：仍只有企业管理员可续费
 }
 
 function renewTip(row) {
   if (renewCooldown.value > 0) return `请 ${renewCooldown.value} 秒后再试`
-  if (row?.status === 'reclaimed') return '该套餐已回收，无法续费，请重新购买'
-  if (!packages.value.canPurchase) return packages.value.denyReason || '当前账号不可购买'
+  const st = String(row?.status || '').toLowerCase()
+  if (st === 'reclaimed') return '该套餐已回收，无法续费，请重新购买'
+  if (st === 'failed') return '该套餐开通失败，无法续费，请重新购买'
+  if (perm.identity !== 'personal' && !packages.value.canPurchase) {
+    return packages.value.denyReason || '当前账号不可续费'
+  }
   return ''
 }
 
@@ -300,6 +315,29 @@ function canBuy(p) {
 
 // 7 天内到期（含剩不到 1 天、按小时显示的情况）→ 整行淡红底 + 状态「即将到期」
 // 容量三段式：数量 × 单份 = 总量（文档要求）
+// 单份价格（分）：企业域 row.priceCents 是单份价，个人域也只有单份价
+function unitCents(row) {
+  return Number(row.unitPriceCents ?? row.priceCents ?? 0)
+}
+
+// 该笔总价（分）：优先后端总价，否则单份 × 数量
+function totalCentsOf(row) {
+  if (row.totalPriceCents != null) return Number(row.totalPriceCents)
+  const qty = Number(row.quantity || 1)
+  return unitCents(row) * (qty > 0 ? qty : 1)
+}
+
+// 状态描述：企业域 active/grace/reclaimed，个人域 pending/granting/active/grace/expired/failed
+function subState(row) {
+  const st = String(row?.status || '').toLowerCase()
+  if (st === 'failed') return { text: '开通失败', type: 'danger' }
+  if (st === 'pending' || st === 'granting') return { text: '开通中', type: 'warning' }
+  if (st === 'reclaimed') return { text: '已回收', type: 'info' }
+  if (expired(row)) return { text: '已到期', type: 'info' }
+  if (st === 'grace') return { text: '宽限期', type: 'warning' }
+  return { text: '有效', type: 'success' }
+}
+
 function quotaBreakdown(row) {
   const qty = Number(row.quantity || 1)
   const unit = Number(row.unitQuotaGb ?? row.quotaGb ?? 0)
@@ -339,13 +377,24 @@ async function loadPackages() {
 }
 
 async function loadSubscriptions() {
-  // 订阅清单需要 org.member.manage（普通成员调用会 40301），没权限就不发请求
-  if (!canSeeSubs.value) { subscriptions.value = []; return }
+  if (!canSeeSubs.value) { subscriptions.value = []; subsDenied.value = ''; return }
   try {
-    const res = await enterpriseApi.subscriptions()
-    subscriptions.value = res?.list || []
+    // 个人域读自己的开通记录（裸数组），企业域读企业池清单（{ total, list }）
+    const res = perm.identity === 'personal'
+      ? await enterpriseApi.mySubscriptions()
+      : await enterpriseApi.subscriptions()
+    subscriptions.value = Array.isArray(res) ? res : (res?.list || [])
+    subsDenied.value = ''
   } catch (e) {
     subscriptions.value = []
+    const msg = String(e?.message || '')
+    if (/只在企业内可用|个人域|未上线|404/.test(msg)) {
+      subsDenied.value = '当前版本后端未提供个人套餐记录接口，续费功能需后端上线后自动可用'
+    } else if (/权限|40301|FORBIDDEN/.test(msg)) {
+      subsDenied.value = '当前角色没有查看套餐记录的权限，请联系管理员分配'
+    } else {
+      subsDenied.value = ''
+    }
   }
 }
 
@@ -427,7 +476,7 @@ async function renew(row) {
   if (!wallet.value) await loadWallet()
   const qty = Number(row.quantity || 1)
   const totalQuotaGb = Number(row.totalQuotaGb ?? row.unitQuotaGb ?? row.quotaGb ?? 0)
-  const totalCents = Number(row.totalPriceCents ?? row.priceCents ?? 0)
+  const totalCents = totalCentsOf(row)
   const days = Number(row.periodDays || row.extendDays || 30)
   const before = row.expireAt || ''
   // 续费确认弹窗必须写清：金额、延长天数、新旧到期时间（文档 §2.4）
@@ -467,6 +516,35 @@ function addDaysIso(iso, days) {
   return d.toISOString()
 }
 
+// 续费成功后原地更新「原来那一行」：只改到期时间与续费次数，不新增行
+// （后端 2a2d739 起续费不再产生新的开通记录，列表行数应与续费前一致）
+// 续费结果的「原到期 → 新到期 + 扣费」，用于进度弹窗副文案
+function renewResultText(r) {
+  const before = r?.expireAtBefore
+  const after = r?.expireAtAfter
+  const yuan = r?.priceYuan != null ? `扣费 ¥${r.priceYuan}` : ''
+  if (before && after) {
+    return `${fmtDateTime(before)} → ${fmtDateTime(after)}${yuan ? '　' + yuan : ''}`
+  }
+  if (after) return `新到期时间 ${fmtDateTime(after)}${yuan ? '　' + yuan : ''}`
+  return yuan
+}
+
+function applyRenewResult(orderItemId, r) {
+  const idx = subscriptions.value.findIndex(s => String(s.orderItemId) === String(orderItemId))
+  if (idx < 0) return
+  const cur = subscriptions.value[idx]
+  const renewals = Number(cur.renewals || 0) + (r?.duplicated ? 0 : 1)
+  subscriptions.value.splice(idx, 1, {
+    ...cur,
+    expireAt: r?.expireAtAfter || cur.expireAt,
+    renewals,
+    // 续费后必然重新有效：清掉已到期标记，状态回到 active
+    expired: false,
+    status: String(cur.status || '').toLowerCase() === 'failed' ? cur.status : 'active'
+  })
+}
+
 async function runRenew(payload) {
   renewing.value = payload.orderItemId
   openProvision(`续费 · ${confirmItem.value?.name || ''}`)
@@ -475,7 +553,7 @@ async function runRenew(payload) {
     // 续费只调一个接口（不再走 /orders），后端直接延长旧开通
     const r = await enterpriseApi.renewSubscription(payload.orderItemId)
     if (r?.duplicated) {
-      setProvision('done', 100, '重复提交，本次未扣款', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
+      setProvision('done', 100, '重复提交，本次未扣款', renewResultText(r))
     } else {
       setProvision('running', 60, '开通中…')
       const orderId = r?.portalOrderId ?? r?.orderId ?? null
@@ -483,14 +561,17 @@ async function runRenew(payload) {
         const result = await pollProvision(orderId, {
           onTick: (i, total) => setProvision('running', 60 + Math.round((i / total) * 35), '开通中…')
         })
-        if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+        if (result === 'done') setProvision('done', 100, '续费成功，套餐已生效', renewResultText(r))
         else if (result === 'failed') setProvision('failed', 100, '开通失败', '请到门户查看订单状态。')
-        else setProvision('done', 100, '续费已完成', `到期时间 ${fmtDateTime(r?.expireAtAfter)}`)
+        else setProvision('done', 100, '续费已完成', renewResultText(r))
       } else {
-        setProvision('done', 100, '续费成功，套餐已生效', r?.expireAtAfter ? `新到期时间 ${fmtDateTime(r.expireAtAfter)}` : '')
+        setProvision('done', 100, '续费成功，套餐已生效', renewResultText(r))
       }
     }
-    await Promise.all([loadPackages(), loadSubscriptions()])
+    // 原地更新那一行（后端 2a2d739 起续费只改原行、不新增记录）
+    applyRenewResult(payload.orderItemId, r)
+    // 不再全量重拉订阅：行已是最新，全量拉取在回调时序未落库时会把界面回退成旧到期时间
+    await loadPackages()
   } catch (e) {
     const msg = String(e?.message || '')
     // 续费节流（默认 3 秒）：不扣款、不延长，前端倒计时后再允许点击
@@ -522,6 +603,10 @@ onMounted(refreshAll)
 </script>
 
 <style scoped>
+.subs-denied { display: flex; align-items: center; gap: 6px; padding: 10px 16px;
+  font-size: 12px; color: var(--cs-text-tertiary); background: var(--cs-bg-page);
+  border-top: 1px solid var(--cs-border-light); }
+
 .sub-name { font-size: 13px; color: var(--cs-text-primary); }
 .sub-sub { margin-top: 2px; font-size: 11px; color: var(--cs-text-tertiary); }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }

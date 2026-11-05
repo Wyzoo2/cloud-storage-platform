@@ -41,10 +41,19 @@ export const usePermissionStore = defineStore('permission', () => {
     if (ctx.value?.isEnterpriseAdmin != null) return !!ctx.value.isEnterpriseAdmin
     return loginScope() === 'enterprise'
   })
-  const identity = computed(() => (isPlatform.value ? 'platform' : 'enterprise'))
+  // 三态身份：platform（平台管理员）/ enterprise（企业域）/ personal（个人域，普通用户）
+  const identity = computed(() => {
+    if (isPlatform.value) return 'platform'
+    // ctx 未加载完时先按企业域处理，避免菜单与按钮来回闪
+    if (!ctx.value) return 'enterprise'
+    const eid = ctx.value.enterpriseId
+    if (eid == null || Number(eid) <= 0) return 'personal'
+    return 'enterprise'
+  })
   // 界面上展示的账号身份：平台/企业管理员，普通成员显示角色名
   const identityLabel = computed(() => {
     if (isPlatform.value) return '系统管理员'
+    if (identity.value === 'personal') return '普通用户'
     if (isEnterpriseAdmin.value) return '企业管理员'
     return roles.value?.[0]?.name || '成员'
   })

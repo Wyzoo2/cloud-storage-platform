@@ -187,7 +187,10 @@ export const enterpriseApi = {
   // 设为语义：bytes 为目标额度，0 = 收回；返回 { localUserId, allocatedBytes, pool }
   setAllocation: (localUserId, bytes) => request.put(`/enterprise/allocations/${localUserId}`, { bytes }),
   // 企业套餐清单：{ total, list: [{ orderItemId, skuId, skuName, quotaGb, priceCents, grantedBytes, status, expireAt, reclaimedAt }] }
-  subscriptions: () => request.get('/enterprise/subscriptions'),
+  // 企业域：企业池套餐清单；成员无 org.member.read 时静默失败，由页面提示
+  subscriptions: () => request.get('/enterprise/subscriptions', { silent: true }),
+  // 个人域（普通用户）：自己的套餐开通记录（裸数组），后端未上线时返回 404，由页面提示
+  mySubscriptions: () => request.get('/billing/subscriptions', { silent: true }),
   // 续费：一步完成（后端直接延长旧开通、容量不变）
   // 旧路径 /enterprise/subscriptions/{id}/renew 已下线，这里不做改打旧接口的兜底：
   // 续费是写操作，失败重试须复用同一笔幂等键，由页面层负责提示与重试

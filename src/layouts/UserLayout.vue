@@ -63,7 +63,8 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item @click="router.push('/profile')"><el-icon><Setting /></el-icon>个人设置</el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
+                <el-dropdown-item v-if="canUseAdmin" divided @click="goAdmin"><el-icon><Monitor /></el-icon>进入管理端</el-dropdown-item>
+                <el-dropdown-item :divided="!canUseAdmin" @click="handleLogout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -93,6 +94,8 @@ import { useBillingStore } from '@/stores/billing'
 import { usePermissionStore } from '@/stores/permission'
 import EnterpriseNoticeBar from '@/components/EnterpriseNoticeBar.vue'
 import { USER_MENUS, filterMenus } from '@/constants/menus'
+
+import { landingPath } from '@/utils/landing'
 import { fetchUploadTasks } from '@/utils/uploadTaskStore'
 // 已按需求停用：强制改密弹框
 // import ForcePasswordDialog from '@/components/ForcePasswordDialog.vue'
@@ -194,6 +197,14 @@ function formatSize(bytes) {
   const k = 1024, sizes = ['B','KB','MB','GB','TB','PB','EB','ZB','YB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+// 是否具备管理端身份（平台管理员 / 企业管理员）——与 AdminLayout 的「返回用户端」对称
+const canUseAdmin = computed(() => perm.isPlatform || perm.isEnterpriseAdmin)
+
+// 进入管理端：跳到该账号真正有权限的管理端落地页，而不是写死 /admin/dashboard
+function goAdmin() {
+  router.push(landingPath(perm, { prefer: 'admin' }))
 }
 
 function handleLogout() { userStore.logout(); router.push('/login') }
