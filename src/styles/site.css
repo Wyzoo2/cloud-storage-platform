@@ -204,6 +204,9 @@
 
 /* ========== 通用区块 ========== */
 .section { padding: 84px 0; }
+/* 锚点跳转时给吸顶导航留出高度，避免标题被压在导航下面 */
+section[id] { scroll-margin-top: calc(var(--site-nav-h) + 18px); }
+#top { scroll-margin-top: 0; }
 .section--tint { background: var(--site-tint); }
 [data-theme="dark"] .section--tint { background: #0f1c22; }
 .section--tight { padding: 60px 0; }

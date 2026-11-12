@@ -256,7 +256,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import { DATA_SCOPES } from '@/constants/menus'
@@ -264,13 +264,56 @@ import { DATA_SCOPES } from '@/constants/menus'
 const loggedIn = computed(() => !!localStorage.getItem('cs-token'))
 const brandTo = computed(() => (loggedIn.value ? '/files' : '/welcome'))
 
-const navLinks = [
-  { label: '首页', to: '/welcome', active: true },
-  { label: '功能', anchor: '#features' },
-  { label: '安全', anchor: '#security' },
-  { label: '企业版', anchor: '#enterprise' },
-  { label: '价格', anchor: '#pricing' }
+// 顶部导航锚点：点击立刻高亮，滚动时再按当前可视区块反向同步（scroll-spy）
+const SECTIONS = [
+  { key: 'features', label: '功能', anchor: '#features' },
+  { key: 'security', label: '安全', anchor: '#security' },
+  { key: 'enterprise', label: '企业版', anchor: '#enterprise' },
+  { key: 'pricing', label: '价格', anchor: '#pricing' }
 ]
+const activeKey = ref('home')
+const navLinks = computed(() => [
+  { label: '首页', anchor: '#top', active: activeKey.value === 'home' },
+  ...SECTIONS.map(s => ({ label: s.label, anchor: s.anchor, active: activeKey.value === s.key }))
+])
+
+let scrollRaf = 0
+function syncActiveByScroll() {
+  const offset = 120
+  const y = window.scrollY || window.pageYOffset || 0
+  if (y < 80) { activeKey.value = 'home'; return }
+  // 取「已经滚过导航线、且位置最靠下」的那个区块，避免导航顺序与区块顺序不一致时选错
+  let current = 'home'
+  let nearest = -Infinity
+  for (const s of SECTIONS) {
+    const el = document.getElementById(s.key)
+    if (!el) continue
+    const top = el.getBoundingClientRect().top
+    if (top <= offset && top > nearest) { nearest = top; current = s.key }
+  }
+  activeKey.value = current
+}
+function onScroll() {
+  if (scrollRaf) return
+  scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; syncActiveByScroll() })
+}
+function onHashChange() {
+  const key = (window.location.hash || '').replace('#', '')
+  if (!key || key === 'top') activeKey.value = 'home'
+  else if (SECTIONS.some(s => s.key === key)) activeKey.value = key
+}
+onMounted(() => {
+  // 直接用 #features 之类的链接进来时，也要落在正确的导航高亮上
+  onHashChange()
+  onScroll()
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('hashchange', onHashChange)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('hashchange', onHashChange)
+  if (scrollRaf) cancelAnimationFrame(scrollRaf)
+})
 
 // 数据范围直接取产品里的真实四档配置
 const scopes = DATA_SCOPES
