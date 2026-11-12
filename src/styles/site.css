@@ -22,11 +22,18 @@
   position: sticky;
   top: 0;
   z-index: 60;
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: saturate(180%) blur(16px);
+  background: var(--cs-bg-container);
   border-bottom: 1px solid var(--site-hairline);
 }
-[data-theme="dark"] .site-nav { background: rgba(14, 26, 32, 0.86); }
+.site-nav::after {
+  /* 滚动到底部时的视觉分隔，代替原先的 backdrop-filter 毛玻璃（滚动时几乎零开销） */
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, rgba(23, 190, 208, 0.35), rgba(2, 145, 213, 0.15), rgba(23, 190, 208, 0));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+[data-theme="dark"] .site-nav { background: #0e1a20; }
 .site-nav__inner { height: var(--site-nav-h); display: flex; align-items: center; gap: 30px; }
 .site-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; }
 .site-brand__logo { width: 38px; height: 38px; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 6px 16px rgba(16, 58, 76, 0.12); }

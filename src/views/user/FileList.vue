@@ -51,7 +51,7 @@
         </div>
       </div>
     </div>
-    <div v-if="viewMode === 'table'" class="file-table cs-surface">
+    <div v-show="viewMode === 'table'" class="file-table cs-surface">
       <el-table ref="tableRef" :key="tableKey" :data="tableFiles" :height="tableHeight" v-loading="fileStore.loading" lazy row-key="id" :tree-props="{ checkStrictly: true, children: 'children', hasChildren: 'hasChildren' }" :load="loadChildren" style="width: 100%; min-width: 720px" @selection-change="handleSelectionChange" @select="onRowSelect" :default-sort="{ prop: 'updatedAt', order: 'descending' }" @sort-change="handleSortChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" label="文件名" min-width="300" sortable="custom">
@@ -84,7 +84,7 @@
         </el-table-column>
       </el-table>
     </div>
-    <div v-else class="file-grid">
+    <div v-show="viewMode === 'grid'" class="file-grid">
       <div v-for="file in filteredFiles" :key="file.id" class="file-grid-item cs-card" @dblclick="handleOpen(file)">
         <div class="grid-icon" :style="{ background: iconTile(file) }">
           <el-icon :size="30" :color="getFileIconColor(file)"><component :is="getFileIcon(file)" /></el-icon>
@@ -262,6 +262,12 @@ watch(() => route.query.kw, kw => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', updateTableHeight)
+})
+
+// 视图切换：表格改用 v-show 保留实例（避免每次切换都重建 el-table），切回来时补一次尺寸计算
+watch(viewMode, v => {
+  if (v !== 'table') return
+  nextTick(() => { updateTableHeight(); tableRef.value?.doLayout?.() })
 })
 
 // 搜索走后端（GET /files?keyword=），不在本地过滤当前页；排序同样交后端

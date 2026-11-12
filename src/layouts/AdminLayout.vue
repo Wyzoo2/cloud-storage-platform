@@ -36,7 +36,7 @@
     <main class="site-main content">
       <EnterpriseNoticeBar />
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in"><component :is="Component" /></transition>
+        <transition name="fade"><component :is="Component" /></transition>
       </router-view>
     </main>
 
