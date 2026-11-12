@@ -1,7 +1,9 @@
 <template>
   <div class="cs-page">
-    <div class="page-head">
+    <div class="breadcrumb-bar">
+      <div class="title-row">
       <h2 class="page-title"><el-icon><Goods /></el-icon>套餐增值</h2>
+      </div>
       <el-button link :loading="loading" @click="refreshAll">
         <el-icon><Refresh /></el-icon>刷新
       </el-button>
@@ -24,45 +26,73 @@
       :title="packages.denyReason"
     />
 
-    <!-- 在售套餐 -->
-    <div class="cs-card section" v-loading="loading">
-      <div class="panel-head">
-        <span>在售套餐</span>
-        <span class="panel-count">{{ packages.list.length }} 个</span>
-      </div>
-      <div class="pkg-grid">
-        <div v-for="p in packages.list" :key="p.skuId" class="pkg-card" :class="{ disabled: !canBuy(p) }">
-          <div class="pkg-top">
-            <div class="pkg-area">
-              <span class="area-num">{{ fmtQuota(p.quotaGb).num }}</span>
-              <span class="area-unit">{{ fmtQuota(p.quotaGb).unit }}</span>
-            </div>
-            <span class="pkg-stock">{{ stockText(p) }}</span>
-          </div>
-          <div class="pkg-name">
-            {{ p.name }}
-          </div>
-          <div class="pkg-lines">
-            <div class="pkg-line"><span>价格</span><b>¥{{ p.priceYuan }}</b></div>
-            <div class="pkg-line"><span>有效期</span><b>{{ p.periodDays }} 天</b></div>
-            <div v-if="p.spec" class="pkg-line"><span>规格</span><b>{{ p.spec }}</b></div>
-          </div>
-          <el-tooltip :disabled="canBuy(p)" :content="p.denyReason || packages.denyReason || '当前账号不可购买'" placement="top">
-            <span class="pkg-btn-wrap">
-              <el-button
-                type="primary"
-                :disabled="!canBuy(p)"
-                :loading="buying === p.skuId"
-                class="pkg-btn"
-                @click="buy(p)"
-              >
-                {{ canBuy(p) ? '立即购买' : '不可购买' }}
-              </el-button>
+    <!-- 在售套餐：左列表 + 右详情 -->
+    <div class="pkg-ws">
+      <section class="cs-card pkg-list" v-loading="loading">
+        <header class="ws-head">
+          <h3>在售套餐</h3>
+          <span class="ws-count">{{ packages.list.length }} 个</span>
+        </header>
+        <div class="pkg-rows">
+          <button
+            v-for="p in packages.list"
+            :key="p.skuId"
+            class="pkg-row"
+            :class="{ on: selectedSkuId === p.skuId, off: !canBuy(p) }"
+            @click="selectedSkuId = p.skuId"
+          >
+            <span class="row-q">{{ fmtQuota(p.quotaGb).num }}<i>{{ fmtQuota(p.quotaGb).unit }}</i></span>
+            <span class="row-main">
+              <b>{{ p.name }}</b>
+              <em>¥{{ p.priceYuan }} · {{ p.periodDays }} 天</em>
             </span>
-          </el-tooltip>
+            <span class="row-stock">{{ stockText(p) }}</span>
+          </button>
+          <el-empty v-if="!packages.list.length && !loading" description="暂无在售套餐" :image-size="64" />
         </div>
-        <el-empty v-if="!packages.list.length && !loading" description="暂无在售套餐" :image-size="78" class="pkg-empty" />
-      </div>
+      </section>
+
+      <section v-if="selectedPkg" class="cs-card pkg-detail">
+        <header class="detail-head">
+          <div class="detail-title">
+            <span class="detail-kicker">套餐详情</span>
+            <strong>{{ selectedPkg.name }}</strong>
+          </div>
+          <span class="stock-chip">{{ stockText(selectedPkg) }}</span>
+        </header>
+
+        <div class="detail-body">
+          <div class="detail-hero">
+            <div class="hero-num">{{ fmtQuota(selectedPkg.quotaGb).num }}<i>{{ fmtQuota(selectedPkg.quotaGb).unit }}</i></div>
+            <div class="hero-price"><span>¥</span>{{ selectedPkg.priceYuan }}<em>/ {{ selectedPkg.periodDays }} 天</em></div>
+          </div>
+
+          <dl class="detail-spec">
+            <div><dt>容量</dt><dd>{{ selectedPkg.quotaGb }} GB</dd></div>
+            <div><dt>有效期</dt><dd>{{ selectedPkg.periodDays }} 天</dd></div>
+            <div><dt>SKU</dt><dd class="mono">{{ selectedPkg.skuId }}</dd></div>
+            <div v-if="selectedPkg.spec"><dt>规格</dt><dd>{{ selectedPkg.spec }}</dd></div>
+          </dl>
+
+          <p v-if="!canBuy(selectedPkg)" class="detail-deny">
+            <el-icon><InfoFilled /></el-icon>
+            <span>{{ selectedPkg.denyReason || packages.denyReason || '当前账号不可购买该套餐' }}</span>
+          </p>
+
+          <div class="detail-actions">
+            <el-button
+              type="primary"
+              :disabled="!canBuy(selectedPkg)"
+              :loading="buying === selectedPkg.skuId"
+              class="buy-btn"
+              @click="buy(selectedPkg)"
+            >
+              {{ canBuy(selectedPkg) ? '立即购买' : '不可购买' }}
+            </el-button>
+            <span class="detail-note">购买后容量立即进入可用配额，到期自动回收</span>
+          </div>
+        </div>
+      </section>
     </div>
 
     <!-- 我的套餐 -->
@@ -162,7 +192,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Goods, Refresh } from '@element-plus/icons-vue'
 import { billingApi, enterpriseApi, orderApi } from '@/api'
@@ -187,6 +217,16 @@ const renewing = ref(0)
 const packages = ref({ total: 0, canPurchase: false, denyReason: '', buyerType: '', list: [] })
 const subscriptions = ref([])
 const packagesError = ref(false)
+
+// 套餐详情：默认选中第一个在售套餐
+const selectedSkuId = ref('')
+const selectedPkg = computed(() =>
+  packages.value.list.find(p => p.skuId === selectedSkuId.value) || packages.value.list[0] || null
+)
+watch(() => packages.value.list, list => {
+  if (!list.length) { selectedSkuId.value = ''; return }
+  if (!list.some(p => p.skuId === selectedSkuId.value)) selectedSkuId.value = list[0].skuId
+}, { immediate: true })
 
 /* ---------------- 摘要（数据驱动，不写死文案） ---------------- */
 const activeSubs = computed(() => subscriptions.value.filter(s => !expired(s)))
@@ -656,4 +696,63 @@ onMounted(refreshAll)
 .section :deep(.row-expiring:hover > td) { background: rgba(255, 77, 79, .10) !important; }
 .sub-empty { padding: 22px 16px; font-size: 12px; text-align: center; color: var(--cs-text-tertiary); }
 .section :deep(.el-table th.el-table__cell) { background: var(--cs-bg-page); color: var(--cs-text-tertiary); font-size: 12px; font-weight: 600; }
+
+/* ---------- 在售套餐：列表 + 详情 ---------- */
+.pkg-ws { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 12px; margin-bottom: 14px; align-items: start; }
+.ws-count { font-size: 11px; color: var(--cs-text-tertiary); }
+.pkg-rows { padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 460px; overflow-y: auto; }
+.pkg-row {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--cs-radius);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--cs-transition), border-color var(--cs-transition);
+}
+.pkg-row:hover { background: var(--cs-bg-hover); }
+.pkg-row.on { background: var(--cs-primary-lighter); border-color: rgba(79, 70, 229, 0.28); }
+.pkg-row.off { opacity: 0.62; }
+.row-q { font-family: var(--cs-mono); font-size: 15px; font-weight: 600; color: var(--cs-text-primary); letter-spacing: -0.03em; }
+.row-q i { font-style: normal; font-size: 9.5px; margin-left: 2px; color: var(--cs-text-tertiary); letter-spacing: 0.04em; }
+.row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row-main b { font-size: 12px; font-weight: 600; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-main em { font-style: normal; font-size: 10.5px; color: var(--cs-text-tertiary); }
+.row-stock { font-size: 10px; color: var(--cs-text-tertiary); white-space: nowrap; }
+
+.pkg-detail { overflow: hidden; }
+.detail-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--cs-border-light); }
+.detail-title { display: flex; flex-direction: column; gap: 2px; }
+.detail-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.detail-title strong { font-size: 14px; font-weight: 600; color: var(--cs-text-primary); }
+.stock-chip { font-size: 10.5px; color: var(--cs-text-secondary); border: 1px solid var(--cs-border-light); border-radius: 2px; padding: 2px 6px; background: var(--cs-bg-page); }
+
+.detail-body { padding: 18px 16px 16px; }
+.detail-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.hero-num { font-family: var(--cs-mono); font-size: 44px; font-weight: 600; line-height: 1; letter-spacing: -0.05em; color: var(--cs-text-primary); }
+.hero-num i { font-style: normal; font-size: 13px; margin-left: 4px; color: var(--cs-text-tertiary); letter-spacing: 0.04em; }
+.hero-price { font-family: var(--cs-mono); font-size: 20px; font-weight: 600; color: var(--cs-primary); letter-spacing: -0.02em; }
+.hero-price span { font-size: 12px; margin-right: 1px; }
+.hero-price em { font-style: normal; font-size: 10.5px; font-weight: 400; color: var(--cs-text-tertiary); margin-left: 4px; font-family: inherit; }
+
+.detail-spec { margin: 18px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--cs-border-light); border: 1px solid var(--cs-border-light); border-radius: var(--cs-radius); overflow: hidden; }
+.detail-spec > div { background: var(--cs-bg-container); padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; }
+.detail-spec dt { font-size: 11px; color: var(--cs-text-tertiary); }
+.detail-spec dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); }
+
+.detail-deny { display: flex; align-items: center; gap: 6px; margin: 14px 0 0; font-size: 11px; color: var(--cs-warning); }
+.detail-actions { display: flex; align-items: center; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+.buy-btn { min-width: 132px; height: 34px; }
+.detail-note { font-size: 10.5px; color: var(--cs-text-tertiary); }
+
+@media (max-width: 900px) {
+  .pkg-ws { grid-template-columns: minmax(0, 1fr); }
+  .pkg-rows { max-height: none; }
+  .hero-num { font-size: 34px; }
+}
 </style>

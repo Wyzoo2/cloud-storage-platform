@@ -1,81 +1,73 @@
 <template>
   <div class="login-page">
-    <!-- 左侧：品牌与产品介绍（沿用原内容与主题色） -->
-    <section class="login-brand">
+    <div class="frame">
+    <!-- 左：控制台品牌区（网格底 + 发丝线分栏，无卡片、无渐变） -->
+    <section class="brand">
       <header class="brand-head">
-        <div class="brand-icon"><img :src="logoUrl" alt="云存储" class="brand-logo" /></div>
-        <div class="brand-name-box">
-          <div class="brand-name">云存储</div>
-          <div class="brand-en">CLOUD STORAGE PLATFORM</div>
+        <div class="brand-mark"><img :src="logoUrl" alt="云存储" class="brand-logo" /></div>
+        <div class="brand-id">
+          <b>云存储</b>
+          <span>CLOUD STORAGE CONSOLE</span>
         </div>
       </header>
 
       <div class="brand-body">
-        <h1 class="brand-title">私有云存储平台</h1>
-        <p class="brand-desc">统一的文件工作台，上传、检索、权限与容量管理在一处完成</p>
+        <h1 class="brand-title">把文件、容量与权限<br />收进一个控制台</h1>
+        <p class="brand-desc">上传检索、在线预览、企业空间分配、角色与数据范围、操作审计，全部在同一个工作区里完成。</p>
 
-        <div class="brand-features">
-          <div class="feature-item">
-            <el-icon :size="22"><UploadFilled /></el-icon>
-            <div class="feature-text">
-              <div class="f-title">分片上传 / 秒传 / 断点续传</div>
-              <div class="f-desc">大文件稳定送达，弱网也能续传</div>
-            </div>
+        <dl class="cap-list">
+          <div class="cap">
+            <dt>分片上传 · 秒传 · 断点续传</dt>
+            <dd>大文件稳定送达，弱网也能从中断处继续</dd>
           </div>
-          <div class="feature-item">
-            <el-icon :size="22"><Lock /></el-icon>
-            <div class="feature-text">
-              <div class="f-title">数据本地存储 / 安全可控</div>
-              <div class="f-desc">私有化部署，文件不出内网</div>
-            </div>
+          <div class="cap">
+            <dt>企业空间按成员分配</dt>
+            <dd>套餐进企业池，管理员按人分配额度，超额即时提示</dd>
           </div>
-          <div class="feature-item">
-            <el-icon :size="22"><Monitor /></el-icon>
-            <div class="feature-text">
-              <div class="f-title">200 人起步 / 可扩展至 1000+</div>
-              <div class="f-desc">企业与部门空间按需分配</div>
-            </div>
+          <div class="cap">
+            <dt>角色 × 数据范围双控</dt>
+            <dd>权限点决定能做什么，数据范围决定能看谁的</dd>
           </div>
-        </div>
+        </dl>
       </div>
 
-      <footer class="brand-footer">
-        <el-icon :size="14"><LocationInformation /></el-icon>
-        <span>内网部署 · 数据安全</span>
+      <footer class="brand-foot">
+        <span class="dot"></span>
+        <span>内网部署 · 数据不出域</span>
         <span class="foot-copy">© 2026</span>
       </footer>
     </section>
 
-    <!-- 右侧：登录面板 -->
-    <aside class="login-side">
-      <button
-        class="theme-btn"
-        :title="appStore.theme === 'light' ? '切换暗色模式' : '切换亮色模式'"
-        @click="appStore.toggleTheme"
-      >
+    <!-- 右：登录面板 -->
+    <aside class="side">
+      <button class="icon-btn side-theme" :title="appStore.theme === 'light' ? '切换深色' : '切换浅色'" @click="appStore.toggleTheme">
         <el-icon :size="15"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
       </button>
 
-      <div class="login-box">
-        <h2 class="login-title">登录</h2>
-        <p class="login-sub">{{ portal === 'admin' ? '用管理员账号进入管理端' : '用账号密码进入控制台' }}</p>
-
-        <div class="portal-switch">
-          <el-radio-group v-model="portal" size="large">
-            <el-radio-button value="user"><el-icon><User /></el-icon><span>用户端</span></el-radio-button>
-            <el-radio-button value="admin"><el-icon><UserFilled /></el-icon><span>管理端</span></el-radio-button>
-          </el-radio-group>
+      <div class="box">
+        <div class="box-head">
+          <h2>登录</h2>
+          <span>用账号密码进入{{ portal === 'admin' ? '管理端' : '控制台' }}</span>
         </div>
 
-        <el-form ref="formRef" :model="form" :rules="rules" class="login-form" @submit.prevent="handleLogin">
+        <div class="seg">
+          <button class="seg-btn" :class="{ on: portal === 'user' }" @click="portal = 'user'">
+            <el-icon><User /></el-icon>用户端
+          </button>
+          <button class="seg-btn" :class="{ on: portal === 'admin' }" @click="portal = 'admin'">
+            <el-icon><UserFilled /></el-icon>管理端
+          </button>
+        </div>
+
+        <el-form ref="formRef" :model="form" :rules="rules" class="form" @submit.prevent="handleLogin">
           <div class="field">
-            <label class="field-label">账号</label>
+            <label class="label">账号</label>
             <el-form-item prop="username">
               <el-input v-model="form.username" placeholder="请输入用户名" :prefix-icon="User" clearable />
             </el-form-item>
           </div>
           <div class="field">
-            <label class="field-label">密码</label>
+            <label class="label">密码</label>
             <el-form-item prop="password">
               <el-input
                 v-model="form.password"
@@ -89,19 +81,20 @@
           </div>
 
           <div class="row-between">
-            <el-checkbox v-model="remember" size="small">记住登录信息</el-checkbox>
+            <el-checkbox v-model="remember" size="small">记住账号</el-checkbox>
+            <span class="row-hint">忘记密码请联系管理员</span>
           </div>
 
-          <el-button type="primary" :loading="loading" class="login-btn" @click="handleLogin">
-            登 录
-            <el-icon v-if="!loading" class="btn-arrow"><Right /></el-icon>
+          <el-button type="primary" :loading="loading" class="submit" @click="handleLogin">
+            {{ loading ? '正在验证…' : '登录' }}
+            <el-icon v-if="!loading" class="submit-arrow"><Right /></el-icon>
           </el-button>
         </el-form>
 
-        <p class="login-tip">账号由管理员开通 · 忘记密码请联系管理员</p>
-        <div class="login-footer"><span class="footer-text">© 2026 云存储 · 私有化部署方案</span></div>
+        <p class="tip">账号由管理员统一开通 · 私有化部署方案</p>
       </div>
     </aside>
+    </div>
   </div>
 </template>
 
@@ -111,12 +104,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   Lock,
-  LocationInformation,
-  Monitor,
   Moon,
   Right,
   Sunny,
-  UploadFilled,
   User,
   UserFilled
 } from '@element-plus/icons-vue'
@@ -157,14 +147,11 @@ async function handleLogin() {
   try {
     const payload = { username: form.value.username.trim(), password: form.value.password }
     // 用户端：POST /auth/login（门户账号校验）
-    // 管理端：POST /admin/login（后端只校验本地管理员密码，管理员密码不出本机）
-    // 两者请求体与成功响应体（{ accessToken, refreshToken, user }）完全一致
+    // 管理端：POST /admin/login（后端只校验本地管理员密码）
     const res = portal.value === 'admin' ? await authApi.adminLogin(payload) : await authApi.login(payload)
     userStore.login(res)
-    // 记住登录信息：只存账号，不存密码
     if (remember.value) localStorage.setItem(REMEMBER_KEY, payload.username)
     else localStorage.removeItem(REMEMBER_KEY)
-    // 先拿权限上下文，再决定去管理端还是用户端
     const perm = usePermissionStore()
     await perm.load(true)
     const wantsAdmin = portal.value === 'admin'
@@ -173,7 +160,7 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     router.push(landingPath(perm, { prefer: wantsAdmin && canAdmin ? 'admin' : 'user' }))
   } catch (e) {
-    // 错误提示由请求拦截器统一弹出（如"用户名或密码错误"）
+    // 提示由请求拦截器统一弹出
   } finally {
     loading.value = false
   }
@@ -184,171 +171,179 @@ async function handleLogin() {
 .login-page {
   min-height: 100vh;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
   background: var(--cs-bg-page);
   color: var(--cs-text-primary);
-  overflow-x: hidden;
 }
 
-/* ---------------- 左侧品牌区（沿用原渐变主题） ---------------- */
-.login-brand {
-  flex: 7 1 0;
+/* 居中构图：品牌 + 表单作为一整块居中，表单盒在右栏内水平垂直居中 */
+.frame {
+  width: min(1120px, 100%);
+  min-height: min(700px, calc(100vh - 56px));
+  display: flex;
+  background: var(--cs-bg-container);
+  border: 1px solid var(--cs-border-light);
+  border-radius: var(--cs-radius-xl);
+  box-shadow: var(--cs-shadow-lg);
+  overflow: hidden;
+}
+
+/* ---------------- 左侧品牌区 ---------------- */
+.brand {
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 40px 56px 24px;
-  color: #fff;
+  padding: 44px 56px 26px;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 50%, #764ba2 100%);
-}
-.login-brand::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 1px, transparent 1px);
-  background-size: 22px 22px;
-  pointer-events: none;
-}
-[data-theme="dark"] .login-brand {
-  background: linear-gradient(135deg, #0f1b33 0%, #131c31 50%, #1b1b35 100%);
-  border-right: 1px solid var(--cs-border);
+  background-color: var(--cs-bg-sunken);
+  background-image:
+    repeating-linear-gradient(0deg, var(--cs-border-light) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(90deg, var(--cs-border-light) 0 1px, transparent 1px 64px);
+  background-position: -1px -1px;
 }
 
-.brand-head { display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
-.brand-icon { width: 40px; height: 40px; border-radius: 10px; overflow: hidden; flex: none; background: #fff; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18); }
+.brand-head { display: flex; align-items: center; gap: 11px; }
+.brand-mark { width: 28px; height: 28px; border-radius: 3px; overflow: hidden; flex: none; background: #fff; }
 .brand-logo { width: 100%; height: 100%; object-fit: cover; display: block; }
-.brand-name { font-size: 16px; font-weight: 700; letter-spacing: .2px; }
-.brand-en { margin-top: 3px; font-size: 10px; letter-spacing: 1.6px; opacity: 0.75; }
+.brand-id { display: flex; flex-direction: column; gap: 2px; }
+.brand-id b { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+.brand-id span { font-size: 8.5px; letter-spacing: 0.24em; color: var(--cs-text-tertiary); }
 
-.brand-body { padding: 72px 0 0; max-width: 600px; position: relative; z-index: 1; }
-.brand-title { margin: 0; font-size: 38px; font-weight: 800; letter-spacing: -1px; line-height: 1.15; }
-.brand-desc { margin: 16px 0 0; font-size: 14px; line-height: 1.9; opacity: 0.85; }
-
-.brand-features { margin-top: 52px; display: flex; flex-direction: column; gap: 22px; }
-.feature-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 22px 24px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  transition: background var(--cs-transition), transform var(--cs-transition);
+.brand-body { padding: 92px 0 0; max-width: 620px; }
+.brand-title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.22;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--cs-text-primary);
 }
-.feature-item:hover { background: rgba(255, 255, 255, 0.18); transform: translateX(4px); }
-[data-theme="dark"] .feature-item { background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.24); }
-[data-theme="dark"] .feature-item:hover { background: rgba(59, 130, 246, 0.22); }
-.feature-item .el-icon { margin-top: 1px; opacity: 0.95; }
-.f-title { font-size: 15.5px; font-weight: 600; letter-spacing: .2px; }
-.f-desc { margin-top: 8px; font-size: 13px; line-height: 1.7; opacity: 0.8; }
+.brand-desc {
+  margin: 20px 0 0;
+  max-width: 520px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--cs-text-secondary);
+}
 
-.brand-footer {
+.cap-list { margin: 52px 0 0; padding: 0; max-width: 560px; border-top: 1px solid var(--cs-border); }
+.cap { display: grid; grid-template-columns: 240px 1fr; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--cs-border-light); }
+.cap dt { font-size: 12.5px; font-weight: 600; color: var(--cs-text-primary); letter-spacing: 0.01em; }
+.cap dd { margin: 0; font-size: 12px; line-height: 1.7; color: var(--cs-text-tertiary); }
+
+.brand-foot {
   margin-top: auto;
-  padding-top: 24px;
+  padding-top: 22px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  opacity: 0.75;
-  position: relative;
-  z-index: 1;
+  gap: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--cs-text-tertiary);
 }
-.foot-copy { margin-left: auto; }
+.dot { width: 4px; height: 4px; border-radius: 50%; background: var(--cs-primary); display: inline-block; }
+.foot-copy { margin-left: auto; letter-spacing: 0.1em; }
 
 /* ---------------- 右侧登录面板 ---------------- */
-.login-side {
-  flex: 3 1 0;
-  min-width: 0;
+.side {
+  width: 396px;
+  flex: none;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 36px;
+  padding: 48px 40px;
   background: var(--cs-bg-container);
-  border-left: 1px solid var(--cs-border-light);
+  border-left: 1px solid var(--cs-border);
 }
-.theme-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--cs-border);
-  border-radius: 8px;
-  background: var(--cs-bg-container);
-  color: var(--cs-text-secondary);
+.side-theme { position: absolute; top: 14px; right: 14px; }
+.icon-btn {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 2px;
+  background: transparent; color: var(--cs-text-tertiary);
   cursor: pointer;
-  transition: color var(--cs-transition), border-color var(--cs-transition);
+  transition: background var(--cs-transition), color var(--cs-transition);
 }
-.theme-btn:hover { color: var(--cs-primary); border-color: var(--cs-primary-light); }
+.icon-btn:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
 
-.login-box { width: 100%; max-width: 340px; }
-.login-title { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
-.login-sub { margin: 8px 0 26px; font-size: 12px; color: var(--cs-text-tertiary); }
+.box { width: 100%; max-width: 312px; margin: 0 auto; }
+.box-head { margin-bottom: 22px; }
+.box-head h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.box-head span { display: block; margin-top: 6px; font-size: 11.5px; color: var(--cs-text-tertiary); }
 
-.portal-switch { margin-bottom: 24px; }
-.portal-switch :deep(.el-radio-group) { width: 100%; display: flex; }
-.portal-switch :deep(.el-radio-button) { flex: 1; }
-.portal-switch :deep(.el-radio-button__inner) {
+/* 端口切换：分段控件 */
+.seg { display: flex; border: 1px solid var(--cs-border); border-radius: 2px; overflow: hidden; margin-bottom: 24px; }
+.seg-btn {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--cs-text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--cs-transition), color var(--cs-transition);
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--cs-border); }
+.seg-btn:hover { color: var(--cs-text-primary); background: var(--cs-bg-hover); }
+.seg-btn.on { background: var(--cs-primary-lighter); color: var(--cs-primary); font-weight: 600; }
+
+.field { margin-bottom: 16px; }
+.label { display: block; margin-bottom: 7px; font-size: 11px; letter-spacing: 0.08em; color: var(--cs-text-tertiary); }
+.form :deep(.el-form-item) { margin-bottom: 0; }
+.form :deep(.el-input__wrapper) { height: 40px; padding: 0 12px; border-radius: 6px; }
+.form :deep(.el-input__inner) { font-size: 13px; }
+.form :deep(.el-input__prefix) { margin-right: 6px; color: var(--cs-text-tertiary); }
+/* 聚焦/悬停不描边：只做极轻的底色变化，避免边框抢视觉 */
+.form :deep(.el-input__wrapper:hover) { box-shadow: none !important; }
+.form :deep(.el-input__wrapper.is-focus),
+.form :deep(.el-input__wrapper.is-focus:hover) {
+  box-shadow: none !important;
+  background: var(--cs-bg-hover) !important;
+}
+.form :deep(.el-form-item__error) { padding-top: 4px; font-size: 10.5px; }
+
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 20px; }
+.row-hint { font-size: 10.5px; color: var(--cs-text-tertiary); }
+
+.submit {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   height: 38px;
+  border-radius: 2px;
   font-size: 13px;
-  font-weight: 500;
-}
-
-.field { margin-bottom: 18px; }
-.field-label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--cs-text-secondary); }
-.login-form :deep(.el-form-item) { margin-bottom: 0; }
-.login-form :deep(.el-input__wrapper) { height: 40px; border-radius: 6px; }
-
-.row-between { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 20px; }
-.row-between :deep(.el-checkbox__label) { font-size: 12px; color: var(--cs-text-secondary); }
-
-.login-btn {
-  width: 100%;
-  height: 44px;
-  border-radius: 6px;
-  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 0.06em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--cs-primary) 0%, var(--cs-primary-dark) 100%);
-  border: none;
-  box-shadow: var(--cs-primary-shadow);
 }
-.login-btn:hover { box-shadow: var(--cs-primary-shadow-hover); }
-.btn-arrow { font-size: 13px; }
+.submit-arrow { font-size: 12px; }
 
-.login-tip { margin: 18px 0 0; font-size: 11.5px; color: var(--cs-text-tertiary); line-height: 1.8; white-space: nowrap; }
-.login-footer { margin-top: 22px; }
-.footer-text { font-size: 11px; color: var(--cs-text-tertiary); }
+.tip { margin: 18px 0 0; font-size: 10.5px; line-height: 1.7; color: var(--cs-text-tertiary); }
 
-/* ---------------- 响应式 ---------------- */
-@media (max-width: 1100px) {
-  .login-brand { padding: 32px 40px 20px; }
-  .brand-body { padding-top: 52px; }
+@media (max-width: 1120px) {
+  .brand { padding: 34px 36px 20px; }
+  .brand-body { padding-top: 64px; }
   .brand-title { font-size: 32px; }
+  .cap { grid-template-columns: 200px 1fr; gap: 14px; }
 }
 @media (max-width: 900px) {
-  .login-page { flex-direction: column; }
-  .login-brand { width: 100%; max-width: 100%; padding: 24px 20px 16px; }
-  .login-side { width: 100%; max-width: 100%; }
-  .brand-body, .login-box { width: 100%; max-width: 100%; }
+  .login-page { padding: 0; align-items: stretch; }
+  .frame { flex-direction: column; min-height: 100vh; border: none; border-radius: 0; box-shadow: none; }
+  .brand { padding: 26px 22px 18px; background-image: none; }
   .brand-body { padding-top: 32px; }
-  .brand-features { display: none; }
   .brand-title { font-size: 26px; }
-  .brand-desc { font-size: 13px; }
-  .login-side { flex: 1; padding: 32px 24px 40px; border-left: none; border-top: 1px solid var(--cs-border-light); }
-  .theme-btn { top: 14px; right: 18px; }
+  .brand-desc { margin-top: 14px; }
+  .cap-list { margin-top: 26px; }
+  .cap { grid-template-columns: 1fr; gap: 4px; padding: 10px 0; }
+  .brand-foot { padding-top: 16px; }
+  .side { width: 100%; flex: 1; padding: 28px 22px 36px; border-left: none; border-top: 1px solid var(--cs-border); }
+  .box { max-width: 380px; }
 }
 </style>

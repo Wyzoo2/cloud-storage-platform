@@ -7,6 +7,8 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import { permDirective } from './directives/perm'
+import { installA11yDialogPatch } from './utils/a11yDialog'
+import { installA11yKeyboardPatch } from './utils/a11yKeyboard'
 import './styles/index.css'
 
 const app = createApp(App)
@@ -27,5 +29,8 @@ document.documentElement.setAttribute('data-theme', savedTheme)
 if (savedTheme === 'dark') {
   document.documentElement.classList.add('dark')
 }
+
+installA11yDialogPatch()
+installA11yKeyboardPatch()
 
 app.mount('#app')

@@ -1,6 +1,10 @@
 <template>
   <div class="cs-page">
-    <h2 class="page-title"><el-icon><Document /></el-icon>审计日志</h2>
+        <div class="breadcrumb-bar">
+      <div class="title-row">
+        <h2 class="page-title"><el-icon><Document /></el-icon>审计日志</h2>
+      </div>
+    </div>
     <div class="toolbar cs-card" style="padding: 16px 20px; margin-bottom: 20px;">
       <div class="filter-row">
         <el-select
@@ -38,24 +42,16 @@
         <el-button @click="handleReset"><el-icon><Refresh /></el-icon>重置</el-button>
       </div>
     </div>
+    <div class="log-ws">
     <div class="cs-card table-card">
-      <el-table :data="logs" v-loading="loading" style="width: 100%; min-width: 820px">
-        <el-table-column type="expand">
-          <template #default="{ row }">
-            <div class="expand-detail">
-              <h4>详细信息</h4>
-              <el-descriptions :column="2" border size="small">
-                <el-descriptions-item label="日志ID">{{ row.id }}</el-descriptions-item>
-                <el-descriptions-item label="操作人">{{ row.actorName || row.username || ('ID ' + row.userId) }}</el-descriptions-item>
-                <el-descriptions-item label="动作">{{ actionLabel(row.action) }}</el-descriptions-item>
-                <el-descriptions-item label="目标">{{ targetLabel(row) }}</el-descriptions-item>
-                <el-descriptions-item label="IP地址">{{ row.ip || '--' }}</el-descriptions-item>
-                <el-descriptions-item label="时间">{{ formatDate(row.createdAt) }}</el-descriptions-item>
-                <el-descriptions-item label="详情" :span="2"><pre class="detail-pre">{{ detailText(row) }}</pre></el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </template>
-        </el-table-column>
+      <el-table
+        :data="logs"
+        v-loading="loading"
+        style="width: 100%; min-width: 760px"
+        highlight-current-row
+        :row-class-name="rowClass"
+        @row-click="row => (selectedLog = row)"
+      >
         <el-table-column prop="createdAt" label="时间" width="180">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
@@ -79,9 +75,39 @@
           <template #default="{ row }">{{ row.ip || '--' }}</template>
         </el-table-column>
       </el-table>
+      <div class="pagination-bar">
+        <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next" background @current-change="loadLogs" @size-change="handleSizeChange" />
+      </div>
     </div>
-    <div class="pagination-bar">
-      <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="total" layout="total, sizes, prev, pager, next" background @current-change="loadLogs" @size-change="handleSizeChange" />
+
+      <aside class="cs-card log-side">
+        <template v-if="selectedLog">
+          <header class="log-side-head">
+            <span class="ls-kicker">日志详情</span>
+            <button class="ls-close" title="关闭" @click="selectedLog = null"><el-icon><Close /></el-icon></button>
+          </header>
+          <div class="ls-body">
+            <div class="ls-action">{{ actionLabel(selectedLog.action) }}</div>
+            <div class="ls-target">{{ targetLabel(selectedLog) }}</div>
+
+            <dl class="ls-meta">
+              <div><dt>操作人</dt><dd>{{ selectedLog.actorName || selectedLog.username || ('ID ' + selectedLog.userId) }}</dd></div>
+              <div><dt>时间</dt><dd>{{ formatDate(selectedLog.createdAt) }}</dd></div>
+              <div><dt>IP</dt><dd class="mono">{{ selectedLog.ip || '--' }}</dd></div>
+              <div><dt>日志 ID</dt><dd class="mono">{{ selectedLog.id }}</dd></div>
+            </dl>
+
+            <div class="ls-detail">
+              <span class="ls-label">详情</span>
+              <pre class="detail-pre">{{ detailText(selectedLog) }}</pre>
+            </div>
+          </div>
+        </template>
+        <div v-else class="ls-empty">
+          <el-icon :size="16"><Document /></el-icon>
+          <span>点击左侧任意一条日志查看详情</span>
+        </div>
+      </aside>
     </div>
   </div>
 </template>
@@ -93,6 +119,12 @@ import { adminApi, auditApi } from '@/api'
 import { formatDate } from '@/utils/file'
 
 const logs = ref([])
+const selectedLog = ref(null)
+
+function rowClass({ row }) {
+  return selectedLog.value && selectedLog.value.id === row.id ? 'log-row-on' : ''
+}
+
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(10)
@@ -220,5 +252,31 @@ onMounted(() => {
   .filter-row .el-button + .el-button { margin-left: 0; }
   .expand-detail { padding: 12px 16px; }
   .pagination-bar { justify-content: center; }
+}
+
+/* ---------- 列表 + 右侧详情 ---------- */
+.log-ws { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; align-items: start; }
+
+.log-side { position: sticky; top: 8px; min-height: 320px; display: flex; flex-direction: column; overflow: hidden; }
+.log-side-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.ls-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.ls-close { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.ls-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.ls-body { padding: 14px; }
+.ls-action { font-size: 15px; font-weight: 600; color: var(--cs-text-primary); letter-spacing: -0.01em; }
+.ls-target { margin-top: 3px; font-size: 11.5px; color: var(--cs-text-tertiary); word-break: break-all; }
+.ls-meta { margin: 14px 0 0; padding: 0; border-top: 1px solid var(--cs-border-light); }
+.ls-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cs-border-light); }
+.ls-meta dt { font-size: 11px; color: var(--cs-text-tertiary); }
+.ls-meta dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); text-align: right; word-break: break-all; }
+.ls-detail { margin-top: 14px; }
+.ls-label { display: block; margin-bottom: 6px; font-size: 10px; letter-spacing: 0.1em; color: var(--cs-text-tertiary); }
+.ls-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 40px 16px; font-size: 11.5px; color: var(--cs-text-tertiary); }
+:deep(.log-row-on) { background: var(--cs-primary-lighter) !important; }
+:deep(.log-row-on td.el-table__cell) { background: transparent !important; }
+
+@media (max-width: 1100px) {
+  .log-ws { grid-template-columns: minmax(0, 1fr); }
+  .log-side { position: static; }
 }
 </style>

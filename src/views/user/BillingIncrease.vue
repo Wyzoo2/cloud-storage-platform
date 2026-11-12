@@ -1,6 +1,10 @@
 <template>
   <div class="cs-page">
-    <h2 class="page-title"><el-icon><Wallet /></el-icon>增额申请</h2>
+        <div class="breadcrumb-bar">
+      <div class="title-row">
+        <h2 class="page-title"><el-icon><Wallet /></el-icon>增额申请</h2>
+      </div>
+    </div>
 
     <!-- 超额冻结横幅 -->
     <el-alert

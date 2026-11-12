@@ -23,8 +23,12 @@
       </div>
     </div>
 
+    <div class="rb-ws">
     <div class="file-table cs-card">
       <el-table
+      highlight-current-row
+      :row-class-name="rbRowClass"
+      @row-click="row => (selectedRow = row)"
         ref="tableRef"
         :key="tableKey"
         :data="tableFiles"
@@ -90,6 +94,43 @@
     </div>
 
     <!-- 恢复目标目录选择对话框 -->
+      <aside class="cs-card rb-side">
+        <template v-if="selectedRow">
+          <header class="rb-head">
+            <span class="rb-kicker">回收站条目</span>
+            <button class="rb-close" title="关闭" @click="selectedRow = null"><el-icon><Close /></el-icon></button>
+          </header>
+          <div class="rb-body">
+            <div class="rb-name">
+              <el-icon :size="16"><component :is="selectedRow.isDir ? 'Folder' : 'Document'" /></el-icon>
+              <strong>{{ selectedRow.name }}</strong>
+            </div>
+
+            <dl class="rb-meta">
+              <div><dt>类型</dt><dd>{{ selectedRow.isDir ? '文件夹' : '文件' }}</dd></div>
+              <div><dt>大小</dt><dd class="mono">{{ selectedRow.isDir ? '--' : formatSize(selectedRow.size || 0) }}</dd></div>
+              <div><dt>删除时间</dt><dd>{{ formatDate(selectedRow.deletedAt) }}</dd></div>
+              <div><dt>过期时间</dt><dd>{{ formatDate(selectedRow.expireAt) }}</dd></div>
+            </dl>
+
+            <div class="rb-actions">
+              <el-button v-perm="'recycle.restore'" type="primary" size="small" @click="openRestoreDialog(selectedRow)">恢复</el-button>
+              <el-popconfirm v-if="perm.can('recycle.purge')" title="彻底删除后无法恢复，确定？" width="220" @confirm="handlePermanentDelete(selectedRow)">
+                <template #reference>
+                  <el-button type="danger" plain size="small">彻底删除</el-button>
+                </template>
+              </el-popconfirm>
+            </div>
+            <p class="rb-tip">回收站内文件到期后将被自动清理</p>
+          </div>
+        </template>
+        <div v-else class="rb-empty">
+          <el-icon :size="16"><InfoFilled /></el-icon>
+          <span>点击任意条目查看详情</span>
+        </div>
+      </aside>
+    </div>
+
     <el-dialog v-model="showRestoreDialog" :title="restoreBatch ? '批量恢复到' : '恢复到'" width="440px" append-to-body>
       <div class="restore-target__label">选择恢复到的目标文件夹（默认「全部文件」）：</div>
       <div v-loading="restoreTreeLoading" class="restore-target__tree">
@@ -137,6 +178,12 @@ const currentPage = ref(1)
 const pageSize = ref(10)                  // 默认每页 10 条
 const loading = ref(false)
 const selectedRows = ref([])
+const selectedRow = ref(null)
+
+function rbRowClass({ row }) {
+  return selectedRow.value && selectedRow.value.id === row.id ? 'rb-row-on' : ''
+}
+
 const deleting = ref(false)
 const tableRef = ref(null)
 const tableKey = ref(0)
@@ -576,5 +623,30 @@ function getFileIconColor(file) {
   .breadcrumb-bar { flex-wrap: wrap; gap: 12px; }
   .toolbar { gap: 10px; }
   .toolbar-right { width: 100%; justify-content: flex-start; }
+}
+
+/* ---------- 列表 + 右侧详情 ---------- */
+.rb-ws { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; align-items: start; }
+.rb-side { position: sticky; top: 8px; min-height: 260px; display: flex; flex-direction: column; overflow: hidden; }
+.rb-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.rb-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.rb-close { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.rb-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.rb-body { padding: 14px; }
+.rb-name { display: flex; align-items: center; gap: 7px; color: var(--cs-text-primary); }
+.rb-name strong { font-size: 13px; font-weight: 600; word-break: break-all; }
+.rb-meta { margin: 14px 0 0; padding: 0; border-top: 1px solid var(--cs-border-light); }
+.rb-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cs-border-light); }
+.rb-meta dt { font-size: 11px; color: var(--cs-text-tertiary); }
+.rb-meta dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); }
+.rb-actions { display: flex; gap: 8px; margin-top: 16px; }
+.rb-tip { margin: 12px 0 0; font-size: 10.5px; color: var(--cs-text-tertiary); }
+.rb-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 36px 16px; font-size: 11.5px; color: var(--cs-text-tertiary); }
+:deep(.rb-row-on) { background: var(--cs-primary-lighter) !important; }
+:deep(.rb-row-on td.el-table__cell) { background: transparent !important; }
+
+@media (max-width: 1100px) {
+  .rb-ws { grid-template-columns: minmax(0, 1fr); }
+  .rb-side { position: static; }
 }
 </style>

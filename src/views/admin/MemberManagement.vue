@@ -26,8 +26,17 @@
         <div class="toolbar-right"><el-tag type="info">共 {{ total }} 人</el-tag></div>
       </div>
 
+      <div class="mm-ws">
       <div class="table-wrap">
-        <el-table :data="rows" v-loading="loading" style="width: 100%" row-key="id">
+        <el-table
+          :data="rows"
+          v-loading="loading"
+          style="width: 100%"
+          row-key="id"
+          highlight-current-row
+          :row-class-name="rowClass"
+          @row-click="row => (selected = row)"
+        >
           <el-table-column label="成员" min-width="250">
             <template #default="{ row }">
               <div class="who-text">
@@ -81,6 +90,36 @@
           @current-change="loadList"
           @size-change="handleSizeChange"
         />
+
+      </div>
+
+      <aside class="cs-card mm-side">
+        <template v-if="selected">
+          <header class="mm-head">
+            <span class="mm-kicker">成员详情</span>
+            <button class="mm-close" title="关闭" @click="selected = null"><el-icon><Close /></el-icon></button>
+          </header>
+          <div class="mm-body">
+            <div class="mm-who">
+              <span class="mm-avatar">{{ (displayName(selected) || '?').slice(0, 1) }}</span>
+              <div>
+                <strong>{{ displayName(selected) }}</strong>
+                <em>{{ accountOf(selected) || '无登录账号' }}</em>
+              </div>
+            </div>
+
+            <dl class="mm-meta">
+              <div><dt>部门</dt><dd>{{ selected.deptName || '公司节点' }}</dd></div>
+              <div><dt>状态</dt><dd>{{ selected.status === 'disabled' ? '停用' : '启用' }}</dd></div>
+              <div v-if="selected.roleNames || selected.roles"><dt>角色</dt><dd>{{ roleText(selected) }}</dd></div>
+            </dl>
+          </div>
+        </template>
+        <div v-else class="mm-empty">
+          <el-icon :size="16"><User /></el-icon>
+          <span>点击任意成员查看详情</span>
+        </div>
+      </aside>
       </div>
     </div>
 
@@ -110,7 +149,7 @@
           <el-checkbox-group v-model="form.roleIds" class="role-list">
             <el-checkbox v-for="r in roleOptions" :key="r.id" :value="r.id" class="role-item">
               <span class="role-name">{{ r.name }}</span>
-              <span class="role-code">{{ r.code }}</span>
+              <!-- <span class="role-code">{{ r.code }}</span> -->
             </el-checkbox>
           </el-checkbox-group>
           <div v-if="!roleOptions.length" class="card-hint">该企业还没有角色，请先到「角色管理」创建</div>
@@ -176,6 +215,19 @@ async function loadDepts() {
 
 /* ---------------- 成员列表 ---------------- */
 const rows = ref([])
+
+const selected = ref(null)
+
+function rowClass({ row }) {
+  return selected.value && selected.value.id === row.id ? 'mm-row-on' : ''
+}
+
+// 角色展示：兼容 roleNames 数组 / roles 数组 / roleName 字符串
+function roleText(row) {
+  const names = row.roleNames || row.roles || row.roleName
+  if (Array.isArray(names)) return names.map(r => (typeof r === 'string' ? r : r?.name)).filter(Boolean).join('、') || '--'
+  return names || '--'
+}
 const total = ref(0)
 const page = ref(1)
 const size = ref(20)
@@ -394,5 +446,30 @@ onMounted(async () => {
 
 @media (max-width: 1024px) {
   .scope-cards { grid-template-columns: 1fr; }
+}
+
+/* ---------- 表格 + 右侧成员详情 ---------- */
+.mm-ws { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: start; }
+.mm-side { position: sticky; top: 8px; min-height: 220px; display: flex; flex-direction: column; overflow: hidden; }
+.mm-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.mm-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.mm-close { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.mm-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.mm-body { padding: 14px; }
+.mm-who { display: flex; align-items: center; gap: 10px; }
+.mm-avatar { width: 34px; height: 34px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: var(--cs-primary-lighter); color: var(--cs-primary); font-size: 14px; font-weight: 600; }
+.mm-who strong { display: block; font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
+.mm-who em { font-style: normal; font-size: 10.5px; color: var(--cs-text-tertiary); }
+.mm-meta { margin: 14px 0 0; padding: 0; border-top: 1px solid var(--cs-border-light); }
+.mm-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cs-border-light); }
+.mm-meta dt { font-size: 11px; color: var(--cs-text-tertiary); white-space: nowrap; }
+.mm-meta dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); text-align: right; word-break: break-all; }
+.mm-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; font-size: 11.5px; color: var(--cs-text-tertiary); }
+:deep(.mm-row-on) { background: var(--cs-primary-lighter) !important; }
+:deep(.mm-row-on td.el-table__cell) { background: transparent !important; }
+
+@media (max-width: 1200px) {
+  .mm-ws { grid-template-columns: minmax(0, 1fr); }
+  .mm-side { position: static; }
 }
 </style>

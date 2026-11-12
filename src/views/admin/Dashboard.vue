@@ -1,43 +1,43 @@
 <template>
-  <div class="cs-page">
-    <div class="breadcrumb-bar">
+  <div class="cs-page dash">
+    <div class="dash-bar">
       <div class="title-row">
         <h2 class="page-title"><el-icon><DataAnalysis /></el-icon>统计大盘</h2>
-        <el-tag v-if="perm.identity === 'enterprise'" size="small" effect="plain" class="scope-tag">本企业数据</el-tag>
+        <span v-if="perm.identity === 'enterprise'" class="scope">本企业</span>
+      </div>
+      <div class="dash-hint">
+        <span>口径：个人免费 + 个人增量 + 企业分配；池中未分配余量不计入</span>
+        <button v-if="perm.can('org.member.read')" class="link-btn" @click="router.push('/admin/resources')">企业资源 →</button>
       </div>
     </div>
-    <div class="stats-row">
-      <div v-for="stat in statCards" :key="stat.label" class="stat-card" :class="stat.gradient">
-        <div class="stat-card-content">
-          <div class="stat-icon"><el-icon :size="24"><component :is="stat.icon" /></el-icon></div>
-          <div class="stat-info"><div class="stat-value">{{ stat.value }}</div><div class="stat-label">{{ stat.label }}</div></div>
-        </div>
+
+    <div class="kpis">
+      <div v-for="stat in statCards" :key="stat.label" class="kpi">
+        <span class="kpi-label">{{ stat.label }}</span>
+        <strong class="kpi-value">{{ stat.value }}</strong>
       </div>
     </div>
-    <div class="stats-hint">
-      <span class="hint-text">
-        口径：个人免费 + 个人增量 + 企业分配给成员的额度（企业池中尚未分配的余量不计入）
-      </span>
-      <el-button v-if="perm.can('org.member.read')" link type="primary" size="small" @click="router.push('/admin/resources')">
-        去「企业资源」查看池余量
-      </el-button>
-    </div>
-    <div class="charts-row">
-      <div class="cs-card chart-card">
-        <h3 class="chart-title">存储用量 Top 10</h3>
-        <div ref="topUsersChart" class="chart-container"></div>
-      </div>
-      <div class="cs-card chart-card">
-        <div class="chart-header">
-          <h3 class="chart-title">近 {{ trafficDays }} 日流量趋势</h3>
-          <el-radio-group v-model="trafficDays" size="small" @change="loadTraffic">
-            <el-radio-button :value="7">7 天</el-radio-button>
-            <el-radio-button :value="30">30 天</el-radio-button>
-            <el-radio-button :value="90">90 天</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div ref="trafficChart" class="chart-container"></div>
-      </div>
+
+    <div class="charts">
+      <section class="cs-card panel">
+        <header class="panel-head">
+          <h3>存储用量 Top 10</h3>
+          <span class="panel-note">按已用容量排序</span>
+        </header>
+        <div ref="topUsersChart" class="chart"></div>
+      </section>
+
+      <section class="cs-card panel">
+        <header class="panel-head">
+          <h3>流量趋势</h3>
+          <div class="seg">
+            <button v-for="d in [7, 30, 90]" :key="d" class="seg-btn" :class="{ on: trafficDays === d }" @click="switchDays(d)">
+              {{ d }} 天
+            </button>
+          </div>
+        </header>
+        <div ref="trafficChart" class="chart"></div>
+      </section>
     </div>
   </div>
 </template>
@@ -58,160 +58,142 @@ const topUsersChart = ref(null)
 const trafficChart = ref(null)
 let topChartInstance = null, trafficChartInstance = null
 
-// R-C09 管理端统计数据
 const adminOverview = ref({ totalQuotaBytes: 0, usedBytes: 0, remainingBytes: 0, userCount: 0 })
 const topUsers = ref([])
 const trafficData = ref([])
 const trafficDays = ref(7)
 
 const statCards = computed(() => [
-  { label: '总配额', value: formatSize(adminOverview.value.totalQuotaBytes), icon: 'Wallet', gradient: 'stat-card-gradient-1' },
-  { label: '已用空间', value: formatSize(adminOverview.value.usedBytes), icon: 'Coin', gradient: 'stat-card-gradient-2' },
-  { label: '剩余空间', value: formatSize(adminOverview.value.remainingBytes), icon: 'TrendCharts', gradient: 'stat-card-gradient-3' },
-  { label: '注册用户数', value: adminOverview.value.userCount.toLocaleString(), icon: 'User', gradient: 'stat-card-gradient-4' }
+  { label: '总配额', value: formatSize(adminOverview.value.totalQuotaBytes) },
+  { label: '已用空间', value: formatSize(adminOverview.value.usedBytes) },
+  { label: '剩余空间', value: formatSize(adminOverview.value.remainingBytes) },
+  { label: '注册用户数', value: adminOverview.value.userCount.toLocaleString() }
 ])
 
-function getTextColor() { return appStore.theme === 'dark' ? '#e6edf3' : '#1f2937' }
-function getSubTextColor() { return appStore.theme === 'dark' ? '#8b949e' : '#6b7280' }
-function getBorderColor() { return appStore.theme === 'dark' ? '#30363d' : '#e5e7eb' }
-
-
-// 加载平台总览（规范路径优先，旧路径兜底——后端未上线 /admin/dashboard/* 时行为不变）
-async function loadOverview() {
-  try {
-    const data = await adminApi.statsOverview()
-    adminOverview.value = data
-  } catch (e) {
-    // code=40301 无权限，拦截器已提示
+function palette() {
+  const dark = appStore.theme === 'dark'
+  return {
+    text: dark ? '#a3acba' : '#5a6472',
+    sub: dark ? '#74808f' : '#8a93a0',
+    grid: dark ? 'rgba(255,255,255,0.07)' : '#eef0f3',
+    accent: dark ? '#8b8bf5' : '#4f46e5',
+    second: dark ? '#7aa2f7' : '#2b5bb5',
+    tooltipBg: dark ? '#1a1f2a' : '#ffffff'
   }
 }
 
-// 加载 Top 榜
+function getTextColor() { return palette().text }
+function getSubTextColor() { return palette().sub }
+function getBorderColor() { return palette().grid }
+
+async function loadOverview() {
+  try { adminOverview.value = await adminApi.statsOverview() } catch (e) { /* 40301 已提示 */ }
+}
+
 async function loadTopUsers() {
   try {
     const data = await adminApi.statsTopUsers()
     topUsers.value = Array.isArray(data) ? data : []
-  } catch (e) {
-    topUsers.value = []
-  }
+  } catch (e) { topUsers.value = [] }
 }
 
-// 加载流量曲线
 async function loadTraffic() {
   try {
     const data = await adminApi.statsTraffic({ days: trafficDays.value })
     trafficData.value = Array.isArray(data) ? data : []
-  } catch (e) {
-    trafficData.value = []
-  }
+  } catch (e) { trafficData.value = [] }
   initTrafficChart()
 }
 
-// Top 榜横向柱状图
+function switchDays(d) {
+  if (trafficDays.value === d) return
+  trafficDays.value = d
+  loadTraffic()
+}
+
 function initTopUsersChart() {
   if (!topUsersChart.value) return
   if (topChartInstance) topChartInstance.dispose()
   topChartInstance = echarts.init(topUsersChart.value)
-  const isDark = appStore.theme === 'dark'
+  const c = palette()
   const sorted = [...topUsers.value].sort((a, b) => a.usedBytes - b.usedBytes)
   topChartInstance.setOption({
+    animationDuration: 380,
     tooltip: {
-      trigger: 'axis', axisPointer: { type: 'shadow' },
+      trigger: 'axis',
+      axisPointer: { type: 'shadow', shadowStyle: { color: c.grid } },
+      backgroundColor: c.tooltipBg,
+      borderColor: c.grid,
+      textStyle: { color: c.text, fontSize: 11.5 },
       formatter: p => {
         const item = sorted[p[0].dataIndex]
-            const quota = Number(item.quotaBytes || 0)
-    const used = Number(item.usedBytes || 0)
-    const pct = quota > 0 ? Math.round((used / quota) * 1000) / 10 : 0
-    return `${item.nickname || item.username}<br/>已用: ${formatSize(used)}<br/>配额: ${formatSize(quota)}<br/>使用率: ${pct}%`
+        const quota = Number(item.quotaBytes || 0)
+        const used = Number(item.usedBytes || 0)
+        const pct = quota > 0 ? Math.round((used / quota) * 1000) / 10 : 0
+        return `${item.nickname || item.username}<br/>已用 ${formatSize(used)}<br/>配额 ${formatSize(quota)}<br/>使用率 ${pct}%`
       }
     },
-    grid: { left: 80, right: 30, top: 10, bottom: 20 },
+    grid: { left: 112, right: 20, top: 10, bottom: 16 },
     xAxis: {
       type: 'value',
-      axisLabel: { color: getSubTextColor(), formatter: v => formatSize(v) },
-      splitLine: { lineStyle: { color: getBorderColor() } },
+      axisLabel: { color: c.sub, fontSize: 10.5, formatter: v => formatSize(v) },
+      splitLine: { lineStyle: { color: c.grid } },
       axisLine: { show: false }
     },
     yAxis: {
       type: 'category',
       data: sorted.map(u => u.nickname || u.username),
-      axisLabel: { color: getTextColor() },
+      axisLabel: { color: c.text, fontSize: 11, width: 96, overflow: 'truncate' },
       axisLine: { show: false },
       axisTick: { show: false }
     },
     series: [{
       type: 'bar',
-      data: sorted.map(u => ({
-        value: u.usedBytes,
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: isDark ? '#3b82f6' : '#1677ff' },
-            { offset: 1, color: isDark ? '#8b5cf6' : '#764ba2' }
-          ]),
-          borderRadius: [0, 4, 4, 0]
-        }
-      })),
-      barWidth: 20
+      data: sorted.map(u => ({ value: u.usedBytes, itemStyle: { color: c.accent, borderRadius: [0, 3, 3, 0] } })),
+      barWidth: 11
     }]
   })
 }
 
-// 流量趋势折线图
 function initTrafficChart() {
   if (!trafficChart.value) return
   if (trafficChartInstance) trafficChartInstance.dispose()
   trafficChartInstance = echarts.init(trafficChart.value)
-  const isDark = appStore.theme === 'dark'
+  const c = palette()
   const dates = trafficData.value.map(d => d.date)
   const uploads = trafficData.value.map(d => d.uploadBytes)
   const downloads = trafficData.value.map(d => d.downloadBytes)
   trafficChartInstance.setOption({
+    animationDuration: 380,
     tooltip: {
       trigger: 'axis',
+      backgroundColor: c.tooltipBg,
+      borderColor: c.grid,
+      textStyle: { color: c.text, fontSize: 11.5 },
       formatter: p => {
         let s = p[0].axisValue
-        p.forEach(item => { s += `<br/>${item.marker}${item.seriesName}: ${formatSize(item.value)}` })
+        p.forEach(item => { s += `<br/>${item.marker}${item.seriesName} ${formatSize(item.value)}` })
         return s
       }
     },
-    legend: {
-      data: ['上传', '下载'],
-      textStyle: { color: getTextColor() },
-      top: 0, right: 0
-    },
-    grid: { left: 60, right: 20, top: 36, bottom: 30 },
+    legend: { data: ['上传', '下载'], textStyle: { color: c.sub, fontSize: 11 }, top: 0, right: 0, icon: 'roundRect', itemWidth: 9, itemHeight: 9 },
+    grid: { left: 58, right: 16, top: 32, bottom: 24 },
     xAxis: {
       type: 'category',
       data: dates,
-      axisLabel: { color: getSubTextColor(), fontSize: 11 },
-      axisLine: { lineStyle: { color: getBorderColor() } },
+      axisLabel: { color: c.sub, fontSize: 10.5 },
+      axisLine: { lineStyle: { color: c.grid } },
       axisTick: { show: false }
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: getSubTextColor(), formatter: v => formatSize(v) },
-      splitLine: { lineStyle: { color: getBorderColor() } },
+      axisLabel: { color: c.sub, fontSize: 10.5, formatter: v => formatSize(v) },
+      splitLine: { lineStyle: { color: c.grid } },
       axisLine: { show: false }
     },
     series: [
-      {
-        name: '上传', type: 'line', data: uploads, smooth: true,
-        lineStyle: { width: 2, color: isDark ? '#3b82f6' : '#1677ff' },
-        itemStyle: { color: isDark ? '#3b82f6' : '#1677ff' },
-        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: isDark ? 'rgba(59,130,246,0.3)' : 'rgba(22,119,255,0.15)' },
-          { offset: 1, color: 'rgba(255,255,255,0)' }
-        ]) }
-      },
-      {
-        name: '下载', type: 'line', data: downloads, smooth: true,
-        lineStyle: { width: 2, color: isDark ? '#10b981' : '#52c41a' },
-        itemStyle: { color: isDark ? '#10b981' : '#52c41a' },
-        areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: isDark ? 'rgba(16,185,129,0.3)' : 'rgba(82,196,26,0.15)' },
-          { offset: 1, color: 'rgba(255,255,255,0)' }
-        ]) }
-      }
+      { name: '上传', type: 'line', data: uploads, smooth: 0.2, symbol: 'none', lineStyle: { width: 1.8, color: c.accent }, itemStyle: { color: c.accent } },
+      { name: '下载', type: 'line', data: downloads, smooth: 0.2, symbol: 'none', lineStyle: { width: 1.8, color: c.second }, itemStyle: { color: c.second } }
     ]
   })
 }
@@ -235,35 +217,56 @@ watch(() => appStore.theme, () => { refreshCharts() })
 </script>
 
 <style scoped>
-.stats-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; }
-.hint-text { font-size: 11.5px; color: var(--cs-text-tertiary); line-height: 1.6; }
-.title-row { display: flex; align-items: center; gap: 10px; }
-.scope-tag { margin-left: 2px; }
-.page-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 600; color: var(--cs-text-primary); margin: 0 0 24px 0; }
-.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-.stat-card { border-radius: var(--cs-radius-lg); padding: 20px; color: #fff; position: relative; overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease; }
-.stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
-.stat-card::after { content: ''; position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1); }
-.stat-card-content { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
-.stat-icon { width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.stat-value { font-size: 22px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 13px; opacity: 0.85; margin-top: 2px; }
-.charts-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-.chart-card { padding: 20px; transition: box-shadow 0.25s ease; }
-.chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.chart-title { font-size: 15px; font-weight: 600; color: var(--cs-text-primary); margin: 0; }
-.chart-container { height: 320px; }
-@media (max-width: 1200px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr; } }
+.dash { display: flex; flex-direction: column; gap: 14px; }
+.dash-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.scope {
+  font-size: 10px; letter-spacing: 0.1em; color: var(--cs-primary);
+  border: 1px solid rgba(79, 70, 229, 0.28); border-radius: var(--cs-radius-sm);
+  padding: 1px 6px;
+}
+.dash-hint { display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--cs-text-tertiary); }
+.link-btn { border: none; background: none; padding: 0; font-size: 11px; color: var(--cs-primary); cursor: pointer; }
+.link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kpi {
+  background: var(--cs-bg-container);
+  border: 1px solid var(--cs-border-light);
+  border-radius: var(--cs-radius-lg);
+  box-shadow: var(--cs-shadow-sm);
+  padding: 14px 16px 15px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.kpi-label { font-size: 10.5px; letter-spacing: 0.08em; color: var(--cs-text-tertiary); }
+.kpi-value { font-family: var(--cs-mono); font-size: 23px; font-weight: 600; letter-spacing: -0.03em; color: var(--cs-text-primary); line-height: 1; }
+
+.charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.panel { overflow: hidden; }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-bottom: 1px solid var(--cs-border-light);
+}
+.panel-head h3 { font-size: 12.5px; font-weight: 600; color: var(--cs-text-primary); }
+.panel-note { font-size: 10.5px; color: var(--cs-text-tertiary); }
+.chart { height: 306px; padding: 8px 4px 2px; }
+
+.seg { display: inline-flex; border: 1px solid var(--cs-border-light); border-radius: var(--cs-radius-sm); overflow: hidden; background: var(--cs-bg-page); }
+.seg-btn {
+  border: none; background: transparent; color: var(--cs-text-tertiary);
+  font-size: 11px; padding: 3px 9px; cursor: pointer;
+  transition: background var(--cs-transition), color var(--cs-transition);
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--cs-border-light); }
+.seg-btn:hover { color: var(--cs-text-primary); background: var(--cs-bg-hover); }
+.seg-btn.on { background: var(--cs-bg-container); color: var(--cs-primary); font-weight: 600; }
+
+@media (max-width: 1200px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .charts { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
-  .stats-row { gap: 10px; margin-bottom: 16px; }
-  .stat-card { padding: 14px; }
-  .stat-card-content { gap: 10px; }
-  .stat-icon { width: 40px; height: 40px; border-radius: 10px; }
-  .stat-icon .el-icon { font-size: 20px; }
-  .stat-value { font-size: 17px; }
-  .stat-label { font-size: 12px; }
-  .chart-card { padding: 14px; }
-  .chart-header { flex-wrap: wrap; gap: 8px; }
-  .chart-container { height: 240px; }
+  .kpi-value { font-size: 19px; }
+  .chart { height: 232px; }
+  .dash-hint { display: none; }
 }
 </style>

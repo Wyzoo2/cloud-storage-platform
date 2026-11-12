@@ -1,7 +1,9 @@
 <template>
   <div class="cs-page">
-    <div class="page-head">
+    <div class="breadcrumb-bar">
+      <div class="title-row">
       <h2 class="page-title"><el-icon><Coin /></el-icon>{{ isManager ? '企业资源' : '我的企业空间' }}<el-button link type="primary" @click="router.push('/packages')" style="padding-top: 10px;font-size: 14px;">前往套餐增值</el-button></h2>
+      </div>
       <el-button link :loading="loading" @click="refreshAll">
         <el-icon><Refresh /></el-icon>刷新
       </el-button>
@@ -54,12 +56,21 @@
       </div>
     </div>
 
+    <div class="res-ws">
     <div class="cs-card table-card">
       <div class="panel-head">
         <span>成员分配</span>
         <span class="panel-count">{{ allocations.length }}</span>
       </div>
-      <el-table :data="allocations" v-loading="loading" style="width: 100%" row-key="localUserId">
+      <el-table
+        :data="allocations"
+        v-loading="loading"
+        style="width: 100%"
+        row-key="localUserId"
+        highlight-current-row
+        :row-class-name="rowClass"
+        @row-click="row => (selected = row)"
+      >
         <el-table-column label="成员" min-width="220">
           <template #default="{ row }">
             <div class="who">
@@ -94,7 +105,32 @@
           </template>
         </el-table-column>
       </el-table>
-    </div>
+
+      </div>
+
+      <aside class="cs-card res-side">
+        <template v-if="selected">
+          <header class="res-head">
+            <span class="res-kicker">成员额度</span>
+            <button class="res-close" title="关闭" @click="selected = null"><el-icon><Close /></el-icon></button>
+          </header>
+          <div class="res-body">
+            <div class="res-who">{{ selected.displayName || ('用户 #' + selected.localUserId) }}</div>
+            <dl class="res-meta">
+              <div><dt>已分配</dt><dd class="mono">{{ selected.allocatedBytes ? formatSize(selected.allocatedBytes) : '未分配' }}</dd></div>
+              <div><dt>已使用</dt><dd class="mono">{{ formatSize(selected.usedBytes || 0) }}</dd></div>
+              <div><dt>使用率</dt><dd class="mono">{{ selected.allocatedBytes ? usagePct(selected) + '%' : '--' }}</dd></div>
+            </dl>
+            <p class="res-tip">企业池总量 {{ formatSize(pool.totalBytes) }}，未分配余量不计入成员可用额度。</p>
+          </div>
+        </template>
+        <div v-else class="res-empty">
+          <el-icon :size="16"><Coin /></el-icon>
+          <span>点击任意成员查看额度详情</span>
+        </div>
+      </aside>
+      </div>
+
 
     <div v-if="isManager" class="cs-card table-card">
       <div class="panel-head">
@@ -233,6 +269,12 @@ const loading = ref(false)
 const saving = ref(false)
 const pool = ref({ totalBytes: 0, allocatedBytes: 0, usedBytes: 0, availableBytes: 0, availableBytesRaw: 0, overAllocated: false, suspended: false, nextExpireAt: null })
 const allocations = ref([])
+const selected = ref(null)
+
+function rowClass({ row }) {
+  return selected.value && selected.value.localUserId === row.localUserId ? 'res-row-on' : ''
+}
+
 const subscriptions = ref([])
 const renewing = ref(0)
 const dialog = ref(false)
@@ -642,5 +684,28 @@ onMounted(refreshAll)
 
 @media (max-width: 1180px) {
   .pool-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- 成员分配 + 右侧额度详情 ---------- */
+.res-ws { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: start; }
+.res-side { position: sticky; top: 8px; min-height: 220px; display: flex; flex-direction: column; overflow: hidden; }
+.res-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.res-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.res-close { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.res-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.res-body { padding: 14px; }
+.res-who { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); }
+.res-meta { margin: 12px 0 0; padding: 0; border-top: 1px solid var(--cs-border-light); }
+.res-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cs-border-light); }
+.res-meta dt { font-size: 11px; color: var(--cs-text-tertiary); }
+.res-meta dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); text-align: right; }
+.res-tip { margin: 12px 0 0; font-size: 10.5px; line-height: 1.6; color: var(--cs-text-tertiary); }
+.res-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; font-size: 11.5px; color: var(--cs-text-tertiary); }
+:deep(.res-row-on) { background: var(--cs-primary-lighter) !important; }
+:deep(.res-row-on td.el-table__cell) { background: transparent !important; }
+
+@media (max-width: 1200px) {
+  .res-ws { grid-template-columns: minmax(0, 1fr); }
+  .res-side { position: static; }
 }
 </style>

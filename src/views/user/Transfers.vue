@@ -12,6 +12,7 @@
     </div>
 
     <!-- 任务列表（整体一个卡片，行式布局） -->
+    <div class="tr-ws">
     <div class="cs-card task-panel">
       <!-- 空状态 -->
       <div v-if="!transfer.tasks.length" class="panel-empty">
@@ -20,7 +21,7 @@
       </div>
 
       <!-- 任务行 -->
-      <div v-for="t in sortedTasks" v-else :key="t.id" class="task-row">
+      <div v-for="t in sortedTasks" v-else :key="t.id" class="task-row" :class="{ 'is-on': selectedTask && selectedTask.id === t.id }" @click="selectedTask = t">
         <div class="task-row__icon" :style="iconStyle(t)">
           <el-icon :size="20"><component :is="getIconName(t)" /></el-icon>
         </div>
@@ -88,15 +89,59 @@
       layout="total, sizes, prev, pager, next"
       class="task-pagination"
     />
+      <aside class="cs-card tr-side">
+        <template v-if="selectedTask">
+          <header class="tr-head">
+            <span class="tr-kicker">任务详情</span>
+            <button class="tr-close" title="关闭" @click="selectedTask = null"><el-icon><Close /></el-icon></button>
+          </header>
+          <div class="tr-body">
+            <div class="tr-name">{{ selectedTask.name }}</div>
+            <dl class="tr-meta">
+              <div><dt>大小</dt><dd class="mono">{{ formatSize(selectedTask.size || 0) }}</dd></div>
+              <div><dt>状态</dt><dd>{{ stateText(selectedTask) }}</dd></div>
+              <div v-if="stateOf(selectedTask) === 'uploading' || stateOf(selectedTask) === 'paused'">
+                <dt>进度</dt><dd class="mono">{{ transfer.percent(selectedTask) }}%</dd>
+              </div>
+              <div><dt>来源</dt><dd>{{ selectedTask.source === 'remote' ? '服务器文件' : '本地上传' }}</dd></div>
+            </dl>
+            <p class="tr-tip">
+              {{ stateHint(selectedTask) }}
+            </p>
+          </div>
+        </template>
+        <div v-else class="tr-empty">
+          <el-icon :size="16"><InfoFilled /></el-icon>
+          <span>点击任意任务查看详情</span>
+        </div>
+      </aside>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { formatSize, extToType } from '@/utils/file'
 import { useTransferStore } from '@/stores/transfer'
 
 const transfer = useTransferStore()
+
+const selectedTask = ref(null)
+
+function stateText(t) {
+  const st = stateOf(t)
+  return ({ uploading: '传输中', paused: '已暂停 / 待续传', waiting: '等待中', aborted: '已放弃', done: '已完成' })[st] || st
+}
+
+function stateHint(t) {
+  const st = stateOf(t)
+  if (st === 'uploading') return '正在上传，可在右侧操作区暂停；暂停后保留已传分片。'
+  if (st === 'paused') return t.source === 'remote' ? '服务器侧任务待续传，可在操作区继续。' : '已暂停，继续后从断点续传。'
+  if (st === 'waiting') return '正在校验文件指纹，校验完成后自动开始上传。'
+  if (st === 'aborted') return '任务已放弃，如仍需要该文件请重新上传。'
+  return '任务已完成，可在「我的文件」中查看。'
+}
 
 onMounted(() => transfer.refresh())
 
@@ -239,5 +284,27 @@ watch(() => transfer.tasks.length, () => { // 列表清空（删完/清空已完
   .task-row { flex-wrap: wrap; padding: 12px 14px; gap: 10px; }
   .task-row__main { flex: 1 1 calc(100% - 54px); }
   .task-row__ops { width: 100%; justify-content: flex-end; }
+}
+
+/* ---------- 任务列表 + 右侧详情 ---------- */
+.tr-ws { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; align-items: start; }
+.tr-side { position: sticky; top: 8px; min-height: 240px; display: flex; flex-direction: column; overflow: hidden; }
+.tr-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.tr-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.tr-close { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.tr-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.tr-body { padding: 14px; }
+.tr-name { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); word-break: break-all; }
+.tr-meta { margin: 12px 0 0; padding: 0; border-top: 1px solid var(--cs-border-light); }
+.tr-meta > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--cs-border-light); }
+.tr-meta dt { font-size: 11px; color: var(--cs-text-tertiary); }
+.tr-meta dd { margin: 0; font-size: 11.5px; color: var(--cs-text-primary); text-align: right; }
+.tr-tip { margin: 14px 0 0; font-size: 11px; line-height: 1.7; color: var(--cs-text-tertiary); }
+.tr-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; font-size: 11.5px; color: var(--cs-text-tertiary); }
+:deep(.task-row.is-on) { background: var(--cs-primary-lighter); }
+
+@media (max-width: 1100px) {
+  .tr-ws { grid-template-columns: minmax(0, 1fr); }
+  .tr-side { position: static; }
 }
 </style>

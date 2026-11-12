@@ -1,9 +1,9 @@
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="modelValue"
-    width="480px"
-    align-center
-    class="oc-dialog"
+    direction="rtl"
+    size="420px"
+    class="oc-drawer"
     :show-close="true"
     :close-on-click-modal="false"
     @update:model-value="v => emit('update:modelValue', v)"
@@ -93,7 +93,7 @@
         </el-button>
       </div>
     </template>
-  </el-dialog>
+  </el-drawer>
 </template>
 
 <script setup>
@@ -241,6 +241,10 @@ function onQtyChange(v) {
 .oc-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .oc-cancel { min-width: 84px; }
 .oc-confirm { min-width: 148px; font-weight: 600; }
+/* 抽屉形态：右侧滑出，内容区独立滚动 */
+:deep(.el-drawer__header) { margin-bottom: 0; padding: 16px 20px 12px; border-bottom: 1px solid var(--cs-border-light); }
+:deep(.el-drawer__body) { padding: 18px 20px; overflow-y: auto; }
+:deep(.el-drawer__footer) { padding: 12px 20px 16px; border-top: 1px solid var(--cs-border-light); }
 </style>
 
 <style>

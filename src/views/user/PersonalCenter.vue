@@ -1,6 +1,10 @@
 <template>
   <div class="cs-page">
-    <h2 class="page-title"><el-icon><User /></el-icon>个人中心</h2>
+        <div class="breadcrumb-bar">
+      <div class="title-row">
+        <h2 class="page-title"><el-icon><User /></el-icon>个人中心</h2>
+      </div>
+    </div>
     <el-alert
       v-if="perm.perms.length === 0"
       type="warning"

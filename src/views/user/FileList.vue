@@ -129,8 +129,23 @@
         <el-button type="primary" :loading="moveLoading" :disabled="moveTargetId == null" @click="confirmBatchMove">确定移动</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="previewVisible" :title="previewFile?.name || '在线预览'" width="min(920px, 94vw)" top="5vh" destroy-on-close @closed="closePreview">
-      <div v-loading="previewLoading" class="preview-body">
+    <!-- 预览：右侧面板（工作台三区布局的详情区） -->
+    <transition name="slide-side">
+      <aside v-if="previewVisible" class="preview-panel">
+        <header class="pp-head">
+          <div class="pp-title-box">
+            <span class="pp-kicker">在线预览</span>
+            <strong class="pp-title">{{ previewFile?.name || '文件' }}</strong>
+          </div>
+          <div class="pp-actions">
+            <el-button v-if="previewFile" link type="primary" size="small" @click="handleDownload(previewFile)">下载</el-button>
+            <button class="pp-close" title="关闭" @click="previewVisible = false; closePreview()">
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
+        </header>
+        <div class="pp-body-wrap">
+<div v-loading="previewLoading" class="preview-body">
         <div v-if="previewType === 'image'" class="preview-image-wrap">
           <img :src="previewUrl" :alt="previewFile?.name" />
         </div>
@@ -140,7 +155,10 @@
         <pre v-else-if="previewType === 'text'" class="preview-text">{{ previewText }}</pre>
         <div v-else-if="previewType === 'office'" ref="officeContainer" class="preview-office"></div>
       </div>
-    </el-dialog>
+    
+        </div>
+      </aside>
+    </transition>
   </div>
 </template>
 
@@ -1048,14 +1066,25 @@ function getFileIconColor(file) {
 }
 
 /* ===== 在线预览 ===== */
+.pp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--cs-border-light); }
+.pp-title-box { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pp-kicker { font-size: 9.5px; letter-spacing: 0.14em; color: var(--cs-text-tertiary); }
+.pp-title { font-size: 12.5px; font-weight: 600; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-actions { display: flex; align-items: center; gap: 6px; }
+.pp-close { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--cs-text-tertiary); cursor: pointer; }
+.pp-close:hover { background: var(--cs-bg-hover); color: var(--cs-text-primary); }
+.preview-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 460px; z-index: 2000; display: flex; flex-direction: column; background: var(--cs-bg-container); border-left: 1px solid var(--cs-border); box-shadow: var(--cs-shadow-xl); }
+.pp-body-wrap { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 16px; }
+.slide-side-enter-active, .slide-side-leave-active { transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-side-enter-from, .slide-side-leave-to { transform: translateX(24px); opacity: 0; }
 .preview-body { min-height: 320px; display: flex; align-items: center; justify-content: center; }
 .preview-image-wrap { width: 100%; display: flex; align-items: center; justify-content: center; }
-.preview-image-wrap img { max-width: 100%; max-height: 72vh; object-fit: contain; }
-.preview-iframe { width: 100%; height: 72vh; border: none; border-radius: 6px; }
-.preview-media { width: 100%; max-height: 72vh; border-radius: 6px; }
+.preview-image-wrap img { max-width: 100%; max-height: 70vh; object-fit: contain; }
+.preview-iframe { width: 100%; height: 70vh; border: none; border-radius: 6px; }
+.preview-media { width: 100%; max-height: 70vh; border-radius: 6px; }
 .preview-audio { width: 100%; margin-top: 40px; }
-.preview-text { width: 100%; min-height: 320px; max-height: 72vh; margin: 0; padding: 16px; overflow: auto; background: rgba(0, 0, 0, 0.04); border-radius: 6px; font-family: 'Consolas', 'Menlo', 'Monaco', monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; text-align: left; }
-.preview-office { width: 100%; min-height: 320px; max-height: 72vh; overflow: auto; padding: 16px 20px; background: #fff; border-radius: 6px; text-align: left; }
+.preview-text { width: 100%; min-height: 320px; max-height: 70vh; margin: 0; padding: 16px; overflow: auto; background: rgba(0, 0, 0, 0.04); border-radius: 6px; font-family: 'Consolas', 'Menlo', 'Monaco', monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; text-align: left; }
+.preview-office { width: 100%; min-height: 320px; max-height: 70vh; overflow: auto; padding: 16px 20px; background: #fff; border-radius: 6px; text-align: left; }
 
 @media (max-width: 768px) {
   .breadcrumb-bar { flex-wrap: wrap; gap: 12px; }
@@ -1065,5 +1094,8 @@ function getFileIconColor(file) {
   .toolbar-right { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
   .file-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
   .pagination-bar { justify-content: center; }
+}
+@media (max-width: 768px) {
+  .preview-panel { width: 100%; }
 }
 </style>
