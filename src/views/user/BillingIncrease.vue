@@ -251,7 +251,7 @@ function onPageChange(p) {
 .qbar-free { background: #dbeafe; }
 .qbar-extra { background: #d1fae5; }
 .qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
-.qbar-free-fill { background: #3b82f6; }
+.qbar-free-fill { background: var(--cs-grad-brand); }
 .qbar-extra-fill { background: #22c55e; }
 .apply-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .apply-field { display: flex; align-items: center; gap: 12px; }

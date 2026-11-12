@@ -145,8 +145,8 @@ function initTopUsersChart() {
         value: u.usedBytes,
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: isDark ? '#3b82f6' : '#1677ff' },
-            { offset: 1, color: isDark ? '#8b5cf6' : '#764ba2' }
+            { offset: 0, color: isDark ? '#2ed0e0' : '#17bed0' },
+            { offset: 1, color: isDark ? '#1ba7dd' : '#0291d5' }
           ]),
           borderRadius: [0, 4, 4, 0]
         }
@@ -196,17 +196,17 @@ function initTrafficChart() {
     series: [
       {
         name: '上传', type: 'line', data: uploads, smooth: true,
-        lineStyle: { width: 2, color: isDark ? '#3b82f6' : '#1677ff' },
-        itemStyle: { color: isDark ? '#3b82f6' : '#1677ff' },
+        lineStyle: { width: 2, color: isDark ? '#2ed0e0' : '#17bed0' },
+        itemStyle: { color: isDark ? '#2ed0e0' : '#17bed0' },
         areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: isDark ? 'rgba(59,130,246,0.3)' : 'rgba(22,119,255,0.15)' },
+          { offset: 0, color: isDark ? 'rgba(46,208,224,0.3)' : 'rgba(23,190,208,0.18)' },
           { offset: 1, color: 'rgba(255,255,255,0)' }
         ]) }
       },
       {
         name: '下载', type: 'line', data: downloads, smooth: true,
-        lineStyle: { width: 2, color: isDark ? '#10b981' : '#52c41a' },
-        itemStyle: { color: isDark ? '#10b981' : '#52c41a' },
+        lineStyle: { width: 2, color: isDark ? '#3ecf9a' : '#2fb483' },
+        itemStyle: { color: isDark ? '#3ecf9a' : '#2fb483' },
         areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: isDark ? 'rgba(16,185,129,0.3)' : 'rgba(82,196,26,0.15)' },
           { offset: 1, color: 'rgba(255,255,255,0)' }

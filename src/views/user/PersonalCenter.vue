@@ -218,13 +218,13 @@ onMounted(() => {
 .qbar-ent { background: #e0e7ff; }
 .qbar-extra { background: #d1fae5; }
 .qbar-fill { position: absolute; left: 0; top: 0; height: 100%; transition: width 0.3s ease; }
-.qbar-free-fill { background: #3b82f6; }
+.qbar-free-fill { background: var(--cs-grad-brand); }
 .qbar-ent-fill { background: #6366f1; }
 .qbar-extra-fill { background: #22c55e; }
 .quota-detail { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--cs-text-secondary); margin-bottom: 16px; }
 .qd-item { display: inline-flex; align-items: center; gap: 6px; }
 .qdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-.qdot-free { background: #3b82f6; }
+.qdot-free { background: #17bed0; }
 .qdot-ent { background: #6366f1; }
 .qdot-extra { background: #22c55e; }
 .quota-breakdown { display: flex; gap: 32px; flex-wrap: wrap; padding: 16px; background: var(--cs-bg-hover); border-radius: 6px; margin-bottom: 16px; }

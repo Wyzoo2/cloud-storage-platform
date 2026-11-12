@@ -1,34 +1,10 @@
 <template>
   <div class="layout-admin">
-    <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': mobileMenuOpen }">
-      <div class="sidebar-header">
-        <div class="logo-badge"><img :src="logoUrl" alt="云存储" class="logo-img" /></div>
-        <span v-show="!isCollapsed" class="sidebar-title">云存储</span>
-        <el-tag v-show="!isCollapsed" size="small" type="danger" effect="dark">管理端</el-tag>
-      </div>
-      <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
-        <template v-for="m in visibleMenus" :key="m.path">
-          <el-sub-menu v-if="m.children" :index="m.path">
-            <template #title>
-              <el-icon><component :is="m.icon" /></el-icon><span>{{ m.title }}</span>
-            </template>
-            <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ c.title }}</el-menu-item>
-          </el-sub-menu>
-          <el-menu-item v-else :index="m.path">
-            <el-icon><component :is="m.icon" /></el-icon>
-            <template #title>{{ m.title }}</template>
-          </el-menu-item>
-        </template>
-      </el-menu>
-      <div class="sidebar-bottom">
-        <el-button v-if="hasUserPortal" text @click="router.push('/')" class="back-btn"><el-icon><Back /></el-icon><span v-show="!isCollapsed">返回用户端</span></el-button>
-      </div>
-    </aside>
-    <div v-if="isMobile && mobileMenuOpen" class="mobile-mask" @click="closeMobileMenu"></div>
-    <div class="layout-main">
-      <header class="header">
-        <div class="header-left">
-          <el-icon class="collapse-btn" @click="handleMenuClick" :size="20">
+    <!-- 顶部全局栏（与用户端同一骨架，身份区改为管理端标识） -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <button class="icon-btn menu-btn" type="button" @click="handleMenuClick">
+          <el-icon :size="18">
             <template v-if="isMobile">
               <Close v-if="mobileMenuOpen" />
               <Menu v-else />
@@ -38,48 +14,92 @@
               <Expand v-else />
             </template>
           </el-icon>
+        </button>
+        <div class="brand">
+          <div class="logo-badge"><img :src="logoUrl" alt="云存储" class="logo-img" /></div>
+          <div class="brand-text">
+            <span class="brand-name">云存储<em class="brand-badge">管理端</em></span>
+            <span class="brand-sub">Admin Console</span>
+          </div>
         </div>
-        <div class="header-right">
-          <el-tooltip
-            v-if="perm.legacy"
-            content="权限服务暂不可用，菜单按默认权限展示"
-            placement="bottom"
-          >
-            <el-tag size="small" type="warning" effect="plain" class="legacy-chip">兼容模式</el-tag>
-          </el-tooltip>
-          <el-tag v-if="perm.enterpriseName" size="small" effect="plain" class="enterprise-chip">{{ perm.enterpriseName }}</el-tag>
-          <el-tag v-if="currentRoleName" size="small" effect="plain" class="role-chip">{{ currentRoleName }}</el-tag>
-          <button v-if="isDesktop" class="theme-toggle" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
-          <span v-if="walletStore.walletState === 'ok'" class="wallet-chip" :class="{ frozen: walletStore.wallet.frozen }">
-            余额 <b>¥{{ walletStore.wallet.balanceYuan }}</b>
-          </span>
-          <button class="theme-toggle" @click="appStore.toggleTheme" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'">
-            <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
-          </button>
-          <el-dropdown trigger="click">
-            <span class="user-info">
-              <el-avatar :size="32" class="user-avatar admin-avatar"><el-icon :size="18"><User /></el-icon></el-avatar>
+      </div>
+
+      <div class="topbar-title">
+        <span class="title-main">管理控制台</span>
+        <span class="title-sub">组织 · 计费 · 审计</span>
+      </div>
+
+      <div class="topbar-right">
+        <el-tooltip v-if="perm.legacy" content="权限服务暂不可用，菜单按默认权限展示" placement="bottom">
+          <span class="soft-chip warn">兼容模式</span>
+        </el-tooltip>
+        <span v-if="perm.enterpriseName" class="soft-chip">{{ perm.enterpriseName }}</span>
+        <span v-if="currentRoleName" class="soft-chip accent">{{ currentRoleName }}</span>
+        <button v-if="isDesktop" class="icon-btn" type="button" title="检查更新" @click="checkForUpdate"><el-icon :size="18"><RefreshRight /></el-icon></button>
+        <button class="icon-btn" type="button" :title="appStore.theme === 'light' ? '切换暗色' : '切换亮色'" @click="appStore.toggleTheme">
+          <el-icon :size="18"><Moon v-if="appStore.theme === 'light'" /><Sunny v-else /></el-icon>
+        </button>
+        <span v-if="walletStore.walletState === 'ok'" class="wallet-chip" :class="{ frozen: walletStore.wallet.frozen }">
+          <el-icon :size="14"><Wallet /></el-icon>余额<b>¥{{ walletStore.wallet.balanceYuan }}</b>
+        </span>
+        <el-dropdown trigger="click">
+          <span class="user-info">
+            <el-avatar :size="32" class="user-avatar admin-avatar">{{ avatarLetter }}</el-avatar>
+            <span class="user-meta">
               <span class="user-name">{{ userStore.displayName || perm.nickname }}</span>
-              <el-icon :size="12"><ArrowDown /></el-icon>
+              <span class="user-role">{{ perm.identityLabel || '管理员' }}</span>
             </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="handleLogout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
-              </el-dropdown-menu>
+            <el-icon :size="12" class="user-caret"><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handleLogout"><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </header>
+
+    <div class="layout-body">
+      <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': mobileMenuOpen }">
+        <div class="sidebar-scroll">
+          <div v-show="!isCollapsed" class="sidebar-label">管理</div>
+          <el-menu :default-active="route.path" :collapse="isCollapsed" router class="sidebar-menu" @select="handleMenuNavigate">
+            <template v-for="m in visibleMenus" :key="m.path">
+              <el-sub-menu v-if="m.children" :index="m.path">
+                <template #title>
+                  <el-icon><component :is="m.icon" /></el-icon><span>{{ m.title }}</span>
+                </template>
+                <el-menu-item v-for="c in m.children" :key="c.path" :index="c.path">{{ c.title }}</el-menu-item>
+              </el-sub-menu>
+              <el-menu-item v-else :index="m.path">
+                <el-icon><component :is="m.icon" /></el-icon>
+                <template #title>{{ m.title }}</template>
+              </el-menu-item>
             </template>
-          </el-dropdown>
+          </el-menu>
         </div>
-      </header>
-      <EnterpriseNoticeBar />
+        <div class="sidebar-bottom">
+          <button v-if="hasUserPortal && !isCollapsed" class="back-btn" type="button" @click="router.push('/')">
+            <el-icon :size="15"><Back /></el-icon><span>返回用户端</span>
+          </button>
+          <button v-else-if="hasUserPortal" class="storage-mini" type="button" title="返回用户端" @click="router.push('/')">
+            <el-icon :size="18"><Back /></el-icon>
+          </button>
+        </div>
+      </aside>
+      <div v-if="isMobile && mobileMenuOpen" class="mobile-mask" @click="closeMobileMenu"></div>
+
       <main class="content">
+        <EnterpriseNoticeBar />
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in"><component :is="Component" /></transition>
         </router-view>
       </main>
+    </div>
     <!-- 已按需求停用：强制改密弹框（恢复时取消注释）
     <ForcePasswordDialog />
     -->
-    </div>
   </div>
 </template>
 
@@ -102,10 +122,8 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const perm = usePermissionStore()
 const walletStore = useBillingStore()
-// 超额横幅：本次会话关掉后不再打扰（刷新/重新登录后会重新提示）
 
 // 菜单显隐 = 权限点 × 身份（系统管理员 / 企业管理员）；legacy 时隐藏依赖新接口的菜单
-// 当前账号角色名（/me/context.roles）
 const currentRoleName = computed(() => perm.identityLabel || '')
 const visibleMenus = computed(() =>
   filterMenus(ADMIN_MENUS, perm.can, { identity: perm.identity })
@@ -114,6 +132,11 @@ const visibleMenus = computed(() =>
 // 是否还有用户端可用入口（企业管理员可能只有管理端菜单，此时不显示「返回用户端」）
 const hasUserPortal = computed(() => filterMenus(USER_MENUS, perm.can, { identity: perm.identity }).length > 0)
 
+// 头像首字
+const avatarLetter = computed(() => {
+  const name = userStore.displayName || perm.nickname || ''
+  return name ? name.trim().charAt(0).toUpperCase() : 'A'
+})
 
 // 桌面端（Electron）才显示检查更新按钮；点击触发 App.vue 的手动检查
 const isDesktop = !!window.desktop?.isDesktop
@@ -161,61 +184,188 @@ function handleLogout() { userStore.logout(); router.push('/login') }
 </script>
 
 <style scoped>
-.wallet-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 16px;
-  background: var(--cs-bg-hover); font-size: 12px; color: var(--cs-text-tertiary); }
-.wallet-chip b { font-size: 13px; color: var(--cs-text-primary); font-variant-numeric: tabular-nums; }
-.wallet-chip.frozen b { color: var(--cs-danger); }
-.layout-admin { display: flex; height: 100vh; overflow: hidden; }
-.sidebar { width: var(--cs-sidebar-width); height: 100vh; background: var(--cs-sidebar-bg); border-right: 1px solid var(--cs-sidebar-border); display: flex; flex-direction: column; transition: width var(--cs-transition); flex-shrink: 0; overflow: hidden; }
-.sidebar.collapsed { width: 64px; }
-.sidebar-header { height: var(--cs-header-height); display: flex; align-items: center; padding: 0 16px; gap: 10px; border-bottom: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
-.sidebar.collapsed .sidebar-header { justify-content: center; padding: 0; }
-.sidebar-title { font-size: 16px; font-weight: 700; color: #ffffff; white-space: nowrap; letter-spacing: -0.3px; }
-.logo-badge { width: 36px; height: 36px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: #fff; box-shadow: var(--cs-shadow); }
+.layout-admin { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--cs-bg-page); }
+
+/* ---------------- 顶部全局栏 ---------------- */
+.topbar {
+  height: var(--cs-header-height);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 18px 0 12px;
+  background: var(--cs-header-bg);
+  border-bottom: 1px solid var(--cs-header-border);
+  position: relative;
+  z-index: 12;
+}
+.topbar-brand { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo-badge { width: 36px; height: 36px; border-radius: 11px; overflow: hidden; flex-shrink: 0; background: #fff; box-shadow: 0 4px 12px rgba(16, 58, 76, 0.12); }
 .logo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.sidebar-menu { flex: 1; border-right: none !important; padding: 8px; background: transparent !important; }
-.sidebar-menu .el-menu-item { position: relative; border-radius: var(--cs-radius); margin-bottom: 4px; height: 44px; line-height: 44px; transition: all 0.2s ease; color: var(--cs-sidebar-text); }
-.sidebar-menu .el-menu-item:hover { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }
-.sidebar-menu .el-menu-item.is-active { background: var(--cs-sidebar-active-bg); color: var(--cs-sidebar-active-text); font-weight: 600; }
-.sidebar-menu .el-menu-item.is-active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 18px; border-radius: 2px; background: #ffffff; }
-/* 子菜单标题（scoped 穿透） */
-.sidebar-menu :deep(.el-sub-menu__title) { position: relative; border-radius: var(--cs-radius); margin-bottom: 4px; height: 44px; line-height: 44px; transition: all 0.2s ease; color: var(--cs-sidebar-text); }
-.sidebar-menu :deep(.el-sub-menu__title:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); }
-.sidebar-menu :deep(.el-sub-menu__title .el-icon) { color: var(--cs-sidebar-text); }
-.sidebar-menu :deep(.el-sub-menu__title:hover .el-icon) { color: var(--cs-sidebar-active-text); }
-/* 子菜单展开后的容器背景 */
-.sidebar-menu :deep(.el-sub-menu .el-menu) { background: transparent !important; padding: 0; }
-/* 子菜单内部项 */
-.sidebar-menu :deep(.el-sub-menu .el-menu-item) { padding-left: 52px !important; min-width: auto; height: 38px; line-height: 38px; font-size: 13px; color: var(--cs-sidebar-text); opacity: 0.85; }
-.sidebar-menu :deep(.el-sub-menu .el-menu-item:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-sidebar-active-text); opacity: 1; }
-.sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active) { background: var(--cs-sidebar-active-bg); color: var(--cs-sidebar-active-text); font-weight: 600; opacity: 1; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-name { display: flex; align-items: center; gap: 6px; font-size: 15.5px; font-weight: 800; letter-spacing: -0.2px; color: var(--cs-text-primary); white-space: nowrap; }
+.brand-badge {
+  font-style: normal; font-size: 9.5px; font-weight: 800; letter-spacing: 0.2px;
+  padding: 2px 6px; border-radius: 100px;
+  background: var(--cs-grad-brand); color: #fff;
+}
+.brand-sub { font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: var(--cs-primary); }
+
+.topbar-title { display: flex; flex-direction: column; line-height: 1.2; padding-left: 14px; border-left: 1px solid var(--cs-border); }
+.title-main { font-size: 13.5px; font-weight: 800; color: var(--cs-text-primary); letter-spacing: -0.2px; }
+.title-sub { font-size: 10.5px; color: var(--cs-text-tertiary); }
+
+.icon-btn {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1px solid transparent; background: transparent;
+  color: var(--cs-text-secondary); cursor: pointer;
+  transition: all 0.2s ease;
+}
+.icon-btn:hover { background: var(--cs-bg-hover); color: var(--cs-primary-dark); }
+.menu-btn { color: var(--cs-text-tertiary); }
+
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; flex-wrap: nowrap; }
+.soft-chip {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 11px;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-bg-field);
+  border: 1px solid var(--cs-border-light);
+  color: var(--cs-text-secondary);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  max-width: 170px; overflow: hidden; text-overflow: ellipsis;
+}
+.soft-chip.accent { background: var(--cs-primary-lighter); color: var(--cs-primary-dark); border-color: rgba(23, 190, 208, 0.18); }
+.soft-chip.warn { background: rgba(255, 165, 0, 0.1); color: #d98a00; border-color: rgba(255, 165, 0, 0.22); cursor: help; }
+
+.wallet-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 12px;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-primary-lighter); color: var(--cs-primary-dark);
+  border: 1px solid rgba(23, 190, 208, 0.18);
+  font-size: 12px; font-weight: 600;
+}
+.wallet-chip b { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.wallet-chip.frozen { background: rgba(250, 89, 93, 0.1); color: var(--cs-danger); border-color: rgba(250, 89, 93, 0.2); }
+.wallet-chip.frozen b { color: var(--cs-danger); }
+
+.user-info {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 9px 3px 3px;
+  border-radius: var(--cs-radius-pill);
+  cursor: pointer; outline: none;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.user-info:hover { background: var(--cs-bg-hover); border-color: var(--cs-border-light); }
+.user-avatar { background: var(--cs-grad-brand); color: #fff; font-size: 13px; font-weight: 800; }
+.admin-avatar { background: linear-gradient(135deg, #7aa8ff 0%, #5679ff 100%); }
+.user-meta { display: flex; flex-direction: column; line-height: 1.2; }
+.user-name { font-size: 13px; font-weight: 700; color: var(--cs-text-primary); max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-role { font-size: 10.5px; color: var(--cs-text-tertiary); }
+.user-caret { color: var(--cs-text-tertiary); }
+
+/* ---------------- 主体 ---------------- */
+.layout-body { flex: 1; display: flex; min-height: 0; }
+.sidebar {
+  width: var(--cs-sidebar-width);
+  flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: var(--cs-sidebar-bg);
+  border-right: 1px solid var(--cs-sidebar-border);
+  transition: width var(--cs-transition);
+  overflow: hidden;
+}
+.sidebar.collapsed { width: 76px; }
+.sidebar-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 14px 12px 8px; }
+.sidebar-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: 1.1px; text-transform: uppercase;
+  color: var(--cs-text-tertiary); padding: 4px 10px 8px;
+}
+.sidebar-menu { border-right: none !important; background: transparent !important; padding: 0; }
+.sidebar-menu .el-menu-item,
+.sidebar-menu :deep(.el-sub-menu__title) {
+  position: relative;
+  height: 40px; line-height: 40px;
+  border-radius: 10px;
+  margin-bottom: 2px;
+  padding-left: 12px !important;
+  color: var(--cs-sidebar-text);
+  font-weight: 600;
+  font-size: 13.5px;
+  transition: all 0.18s ease;
+}
+.sidebar-menu .el-menu-item .el-icon,
+.sidebar-menu :deep(.el-sub-menu__title .el-icon) { font-size: 17px; width: 17px; margin-right: 11px; color: inherit; }
+.sidebar-menu .el-menu-item:hover,
+.sidebar-menu :deep(.el-sub-menu__title:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-primary-dark); }
+.sidebar-menu .el-menu-item.is-active,
+.sidebar-menu :deep(.el-sub-menu.is-active > .el-sub-menu__title) {
+  background: var(--cs-sidebar-active-bg);
+  color: var(--cs-sidebar-active-text);
+  font-weight: 700;
+}
+.sidebar-menu .el-menu-item.is-active::before,
+.sidebar-menu :deep(.el-sub-menu.is-active > .el-sub-menu__title)::before {
+  content: '';
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0;
+  background: var(--cs-grad-brand);
+}
+/* 子菜单 */
+.sidebar-menu :deep(.el-sub-menu .el-menu) { background: transparent !important; padding: 2px 0 4px; }
+.sidebar-menu :deep(.el-sub-menu .el-menu-item) {
+  padding-left: 40px !important;
+  min-width: auto;
+  height: 36px; line-height: 36px;
+  font-size: 13px; font-weight: 600;
+  color: var(--cs-sidebar-text);
+}
+.sidebar-menu :deep(.el-sub-menu .el-menu-item:hover) { background: var(--cs-sidebar-hover-bg); color: var(--cs-primary-dark); }
+.sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active) {
+  background: var(--cs-sidebar-active-bg);
+  color: var(--cs-sidebar-active-text);
+  font-weight: 700;
+}
 .sidebar-menu :deep(.el-sub-menu .el-menu-item.is-active::before) { height: 14px; }
-.sidebar-bottom { padding: 12px 16px; border-top: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
-.back-btn { width: 100%; justify-content: flex-start; color: var(--cs-sidebar-text) !important; }
-.back-btn:hover { color: var(--cs-sidebar-active-text) !important; }
-.layout-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-.header { height: var(--cs-header-height); background: var(--cs-header-bg); border-bottom: 1px solid var(--cs-header-border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0; }
-.header-left { display: flex; align-items: center; }
-.collapse-btn { cursor: pointer; color: var(--cs-text-secondary); transition: color var(--cs-transition); }
-.collapse-btn:hover { color: var(--cs-primary); }
-.header-right { display: flex; align-items: center; gap: 12px; }
-.legacy-chip { font-weight: 500; cursor: help; }
-.role-chip { color: var(--cs-primary); }
-.user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 8px; border-radius: var(--cs-radius-sm); transition: background var(--cs-transition); }
-.user-info:hover { background: var(--cs-bg-hover); }
-.user-avatar { background: var(--cs-primary-lighter); color: var(--cs-primary); }
-.admin-avatar { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
-.user-name { font-size: 14px; color: var(--cs-text-primary); font-weight: 500; }
-.content { flex: 1; overflow-y: auto; background: var(--cs-bg-page); }
+.sidebar.collapsed .sidebar-menu .el-menu-item,
+.sidebar.collapsed .sidebar-menu :deep(.el-sub-menu__title) { padding-left: 0 !important; display: flex; justify-content: center; }
+.sidebar.collapsed .sidebar-menu .el-menu-item .el-icon,
+.sidebar.collapsed .sidebar-menu :deep(.el-sub-menu__title .el-icon) { margin-right: 0; }
+
+.sidebar-bottom { padding: 10px 12px 14px; border-top: 1px solid var(--cs-sidebar-border); flex-shrink: 0; }
+.back-btn {
+  width: 100%; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--cs-border);
+  background: var(--cs-bg-container);
+  color: var(--cs-text-secondary);
+  font-size: 12.5px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.back-btn:hover { color: var(--cs-primary-dark); border-color: var(--cs-primary-light); background: var(--cs-primary-lighter); }
+.storage-mini {
+  width: 38px; height: 38px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+  border-radius: 11px; border: 1px solid var(--cs-border); background: var(--cs-bg-container);
+  color: var(--cs-primary-dark); cursor: pointer; transition: all 0.2s ease;
+}
+.storage-mini:hover { background: var(--cs-primary-lighter); border-color: var(--cs-primary-light); }
+
+.content { flex: 1; min-width: 0; overflow-y: auto; background: var(--cs-bg-page); }
 .mobile-mask { display: none; }
 
-/* 平板端：侧边栏折叠成图标栏 */
 @media (max-width: 1024px) and (min-width: 769px) {
-  .header { padding: 0 16px; }
+  .topbar { padding: 0 14px 0 10px; gap: 10px; }
+  .soft-chip { display: none; }
+  .user-meta { display: none; }
 }
 
-/* 移动端：侧边栏变抽屉，默认隐藏 */
 @media (max-width: 768px) {
+  .topbar { padding: 0 10px; gap: 8px; height: 58px; }
+  .brand-text, .topbar-title, .soft-chip, .wallet-chip, .user-meta { display: none; }
+  .topbar-right { gap: 4px; }
   .sidebar {
     position: fixed;
     left: 0; top: 0; bottom: 0;
@@ -224,22 +374,15 @@ function handleLogout() { userStore.logout(); router.push('/login') }
     transition: transform var(--cs-transition);
     z-index: 1001;
     box-shadow: var(--cs-shadow-lg);
+    background: var(--cs-sidebar-bg);
   }
   .sidebar.mobile-open { transform: translateX(0); }
   .mobile-mask {
     display: block;
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.45);
+    background: rgba(10, 30, 40, 0.42);
+    backdrop-filter: blur(2px);
     z-index: 1000;
   }
-  .header { padding: 0 12px; }
-  .header-right { gap: 8px; }
-  .user-name { display: none; }
 }
-</style>
-
-<style>
-/* 子菜单弹出层（侧边栏折叠时）——必须全局，因弹出层挂载在 body 下，不在 .sidebar-menu 内部 */
-.el-menu--popup-container { background: #1a1f2e !important; }
-.el-menu--popup-container .el-menu { background: #1a1f2e !important; min-width: 160px; padding: 4px; border: 1px solid rgba(255,255,255,0.08); }
 </style>

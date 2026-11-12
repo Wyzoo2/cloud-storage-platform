@@ -503,7 +503,7 @@ function getFileIcon(file) {
   return m[file.type] || 'Document'
 }
 function getFileIconColor(file) {
-  const m = { folder: '#faad14', pdf: '#ff4d4f', image: '#52c41a', word: '#1677ff', excel: '#52c41a', ppt: '#fa8c16', video: '#722ed1', audio: '#13c2c2', archive: '#8c8c8c', text: '#595959' }
+  const m = { folder: '#f5a623', pdf: '#fa595d', image: '#2fb483', word: '#2f86e0', excel: '#2fb483', ppt: '#f5883a', video: '#8b6ad6', audio: '#17bed0', archive: '#8c9ba5', text: '#6d8593' }
   return m[file.type] || '#8c8c8c'
 }
 </script>

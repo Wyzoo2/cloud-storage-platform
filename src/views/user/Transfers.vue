@@ -104,7 +104,7 @@ const stateOf = t => transfer.stateOf(t)
 
 // ---- 文件图标（与文件列表一致：类型色浅底 + 彩色图标）----
 const iconMap = { pdf: 'Document', image: 'Picture', word: 'Document', excel: 'Grid', ppt: 'Monitor', video: 'VideoCamera', audio: 'Headset', archive: 'Files', text: 'Notebook' }
-const iconColorMap = { pdf: '#ff4d4f', image: '#52c41a', word: '#1677ff', excel: '#52c41a', ppt: '#fa8c16', video: '#722ed1', audio: '#13c2c2', archive: '#8c8c8c', text: '#595959' }
+const iconColorMap = { pdf: '#fa595d', image: '#2fb483', word: '#2f86e0', excel: '#2fb483', ppt: '#f5883a', video: '#8b6ad6', audio: '#17bed0', archive: '#8c9ba5', text: '#6d8593' }
 function getIconName(t) { return iconMap[extToType(t.name)] || 'Document' }
 function iconStyle(t) {
   const c = iconColorMap[extToType(t.name)] || '#8c8c8c'

@@ -1,43 +1,61 @@
 <template>
   <div class="cs-page">
-    <div class="breadcrumb-bar">
-      <div class="breadcrumb-left">
-        <el-button class="back-btn" :disabled="!canGoUp" @click="goUp" title="返回上一级"><el-icon><Back /></el-icon><span>上一级</span></el-button>
-        <el-breadcrumb separator="/">
-          <el-breadcrumb-item><el-icon><HomeFilled /></el-icon></el-breadcrumb-item>
-          <el-breadcrumb-item v-for="item in fileStore.breadcrumb" :key="item.id">
-            <a @click.prevent="handleNavigate(item.id)">{{ item.name }}</a>
-          </el-breadcrumb-item>
-        </el-breadcrumb>
+    <div class="page-head">
+      <div class="page-head-main">
+        <div class="crumb-title">
+          <button class="back-circle" type="button" :disabled="!canGoUp" @click="goUp" title="返回上一级">
+            <el-icon :size="16"><Back /></el-icon>
+          </button>
+          <el-icon :size="17" class="crumb-icon"><FolderOpened /></el-icon>
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item v-for="item in fileStore.breadcrumb" :key="item.id">
+              <a :class="{ 'crumb-home': item.id === 0 }" @click.prevent="handleNavigate(item.id)">{{ item.id === 0 ? '我的文件' : item.name }}</a>
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+        <div class="crumb-meta">
+          <span>{{ fileStore.total }} 个项目 · 支持拖拽整理与在线预览</span>
+          <span v-if="searchText" class="search-chip">
+            搜索「{{ searchText }}」
+            <el-icon :size="12" @click="clearSearch"><Close /></el-icon>
+          </span>
+        </div>
       </div>
-      <div class="breadcrumb-actions">
-        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" type="primary" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
-        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
-        <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" type="warning" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
+      <div class="page-head-actions">
+        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" class="ghost-btn" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
+        <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" class="ghost-btn" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
         <el-button v-if="deleteCount > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
+        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" type="primary" class="upload-btn" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
       </div>
     </div>
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <el-input v-model="searchText" placeholder="搜索文件" :prefix-icon="Search" clearable class="search-input" />
-      </div>
-      <div class="toolbar-right">
-        <el-button v-if="fileStore.total > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleDeleteAll"><el-icon><Delete /></el-icon><span>删除全部文件</span></el-button>
 
-        <el-button-group class="view-switch">
-          <el-button :type="viewMode === 'table' ? 'primary' : ''" @click="viewMode = 'table'"><el-icon><List /></el-icon></el-button>
-          <el-button :type="viewMode === 'grid' ? 'primary' : ''" @click="viewMode = 'grid'"><el-icon><Grid /></el-icon></el-button>
-        </el-button-group>
+    <div class="list-bar">
+      <div class="list-bar-left">
+        <span class="list-label">{{ viewLabel }}</span>
+        <span v-if="selectedRows.length > 0" class="list-selected">已选 {{ selectedRows.length }} 项</span>
+        <el-button v-if="fileStore.total > 0 && canDeleteAny" class="ghost-btn ghost-sm danger-ghost" :loading="deleting" @click="handleDeleteAll"><el-icon><Delete /></el-icon><span>删除全部文件</span></el-button>
+      </div>
+      <div class="list-bar-right">
+        <div class="view-switch">
+          <button type="button" class="vs-item" :class="{ active: viewMode === 'table' }" title="列表视图" @click="viewMode = 'table'">
+            <el-icon :size="16"><List /></el-icon>
+          </button>
+          <button type="button" class="vs-item" :class="{ active: viewMode === 'grid' }" title="网格视图" @click="viewMode = 'grid'">
+            <el-icon :size="16"><Grid /></el-icon>
+          </button>
+        </div>
       </div>
     </div>
-    <div v-if="viewMode === 'table'" class="file-table cs-card">
-      <el-table ref="tableRef" :key="tableKey" :data="tableFiles" v-loading="fileStore.loading" lazy row-key="id" :tree-props="{ checkStrictly: true, children: 'children', hasChildren: 'hasChildren' }" :load="loadChildren" style="width: 100%; min-width: 720px" @selection-change="handleSelectionChange" @select="onRowSelect" :default-sort="{ prop: 'updatedAt', order: 'descending' }" @sort-change="handleSortChange">
+    <div v-if="viewMode === 'table'" class="file-table cs-surface">
+      <el-table ref="tableRef" :key="tableKey" :data="tableFiles" :height="tableHeight" v-loading="fileStore.loading" lazy row-key="id" :tree-props="{ checkStrictly: true, children: 'children', hasChildren: 'hasChildren' }" :load="loadChildren" style="width: 100%; min-width: 720px" @selection-change="handleSelectionChange" @select="onRowSelect" :default-sort="{ prop: 'updatedAt', order: 'descending' }" @sort-change="handleSortChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="name" label="文件名" min-width="300" sortable="custom">
           <template #default="{ row }">
             <div class="file-name-cell" :class="{ 'drop-target': dragOverId === row.id && row.isDir, 'dragging': draggedItem && draggedItem.id === row.id, 'drop-success': dropSuccessId === row.id }" @dblclick="handleOpen(row)" @dragover="row.isDir && handleDragOver(row, $event)" @dragleave="handleDragLeave" @drop="row.isDir && handleDrop(row, $event)">
               <el-icon class="drag-handle" draggable="true" @dragstart="handleDragStart(row, $event)" @dragend="handleDragEnd" :size="14"><Rank /></el-icon>
-              <el-icon :size="20" :color="getFileIconColor(row)"><component :is="getFileIcon(row)" /></el-icon>
+              <span class="file-icon-tile" :style="{ background: iconTile(row) }">
+                <el-icon :size="16" :color="getFileIconColor(row)"><component :is="getFileIcon(row)" /></el-icon>
+              </span>
               <span class="file-name-text">{{ row.name }}</span>
             </div>
           </template>
@@ -63,7 +81,9 @@
     </div>
     <div v-else class="file-grid">
       <div v-for="file in filteredFiles" :key="file.id" class="file-grid-item cs-card" @dblclick="handleOpen(file)">
-        <div class="grid-icon"><el-icon :size="48" :color="getFileIconColor(file)"><component :is="getFileIcon(file)" /></el-icon></div>
+        <div class="grid-icon" :style="{ background: iconTile(file) }">
+          <el-icon :size="30" :color="getFileIconColor(file)"><component :is="getFileIcon(file)" /></el-icon>
+        </div>
         <div class="grid-name" :title="file.name">{{ file.name }}</div>
         <div class="grid-meta">{{ file.isDir ? '文件夹' : formatSize(file.size) }}</div>
       </div>
@@ -145,8 +165,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { Search, Rank, FolderOpened } from '@element-plus/icons-vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Rank, FolderOpened } from '@element-plus/icons-vue'
 import { useFileStore } from '@/stores/file'
 import { useUserStore } from '@/stores/user'
 import { fileApi } from '@/api'
@@ -157,6 +178,8 @@ import { useTransferStore } from '@/stores/transfer'
 import { usePermissionStore } from '@/stores/permission'
 
 const fileStore = useFileStore()
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const transfer = useTransferStore()
 const perm = usePermissionStore()
@@ -164,6 +187,13 @@ const searchText = ref('')
 const sortField = ref('updatedAt')
 const sortOrder = ref('descending')
 const viewMode = ref('table')
+// 列表条左侧的视图名，随切换变化
+const viewLabel = computed(() => viewMode.value === 'table' ? '列表视图' : '网格视图')
+// 清除搜索（顶栏搜索带来的 ?kw= 一并清掉，避免再次被 query 覆盖）
+function clearSearch() {
+  searchText.value = ''
+  if (route.query.kw != null) router.replace({ path: route.path, query: {} })
+}
 const currentPage = ref(1)
 const pageSize = ref(10)
 const showUploadDialog = ref(false)
@@ -199,10 +229,32 @@ const previewText = ref('')
 const previewLoading = ref(false)
 const officeContainer = ref(null)
 
+// 表格高度：内容区不整体滚动，表头固定、列表内部滚动（pCloud 的文件列表行为）
+const tableHeight = ref(520)
+function updateTableHeight() {
+  // 顶栏 64 + 页面上下内边距 48 + 页头/列表条/分页 ≈ 300
+  const chrome = window.innerWidth <= 768 ? 330 : 296
+  tableHeight.value = Math.max(300, window.innerHeight - chrome)
+}
+
 onMounted(() => {
   // 移动端默认用网格视图，更适配小屏
   if (window.innerWidth <= 768) viewMode.value = 'grid'
-  fileStore.loadDir(0, 1, pageSize.value, 'updatedAt,desc')
+  updateTableHeight()
+  window.addEventListener('resize', updateTableHeight)
+  // 顶栏快捷搜索会带 ?kw= 跳进来，直接落到搜索态（watch 里 300ms 防抖后请求）
+  const kw = route.query.kw
+  if (kw) searchText.value = String(kw)
+  else fileStore.loadDir(0, 1, pageSize.value, 'updatedAt,desc')
+})
+
+// 已在本页时再次用顶栏搜索：query 变化也要重新搜索
+watch(() => route.query.kw, kw => {
+  if (kw != null && String(kw) !== searchText.value) searchText.value = String(kw)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateTableHeight)
 })
 
 // 搜索走后端（GET /files?keyword=），不在本地过滤当前页；排序同样交后端
@@ -805,28 +857,54 @@ function getFileIcon(file) {
   return m[file.type] || 'Document'
 }
 function getFileIconColor(file) {
-  const m = { folder:'#faad14',pdf:'#ff4d4f',image:'#52c41a',word:'#1677ff',excel:'#52c41a',ppt:'#fa8c16',video:'#722ed1',audio:'#13c2c2',archive:'#8c8c8c',text:'#595959' }
-  return m[file.type] || '#8c8c8c'
+  const m = { folder:'#f5a623',pdf:'#fa595d',image:'#2fb483',word:'#2f86e0',excel:'#2fb483',ppt:'#f5883a',video:'#8b6ad6',audio:'#17bed0',archive:'#8c9ba5',text:'#6d8593' }
+  return m[file.type] || '#8c9ba5'
+}
+// 图标底色：同色系浅色块（pCloud 风格的方块文件图标）
+function iconTile(file) {
+  return getFileIconColor(file) + '16'
 }
 </script>
 
 <style scoped>
-.file-name-cell { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.file-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ===== 文件列表：pCloud 风格 ===== */
+.file-name-cell { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 2px 0; }
+.file-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--cs-text-primary); }
+.file-icon-tile {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px;
+}
 .file-table { overflow-x: auto; }
-.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
-.file-grid-item { padding: 24px 16px 18px; text-align: center; cursor: pointer; transition: all 0.25s ease; }
-.file-grid-item:hover { transform: translateY(-4px); box-shadow: var(--cs-shadow-lg); border-color: var(--cs-primary-light); }
-.grid-icon { margin-bottom: 12px; }
-.grid-name { font-size: 13px; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; }
+.file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 16px; }
+.file-grid-item {
+  padding: 20px 16px 18px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: var(--cs-radius-lg);
+  transition: all 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.file-grid-item:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--cs-shadow-lg);
+  border-color: rgba(23, 190, 208, 0.35);
+}
+.grid-icon {
+  width: 58px; height: 58px; margin: 0 auto 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 18px;
+  transition: transform 0.24s ease;
+}
+.file-grid-item:hover .grid-icon { transform: scale(1.06); }
+.grid-name { font-size: 13px; font-weight: 600; color: var(--cs-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; }
 .grid-meta { font-size: 12px; color: var(--cs-text-tertiary); }
 .pagination-bar { display: flex; justify-content: flex-end; margin-top: 20px; padding: 12px 0; }
 .upload-icon { color: var(--cs-primary); margin-bottom: 8px; }
 
 /* 上传对话框：目录选择器 */
 .upload-target { margin-bottom: 16px; }
-.upload-target__label { font-size: 13px; color: #606266; margin-bottom: 6px; }
-.upload-target__tree { max-height: 220px; overflow-y: auto; padding: 2px 6px; border: 1px solid #dcdfe6; border-radius: 6px; }
+.upload-target__label { font-size: 13px; color: var(--cs-text-secondary); margin-bottom: 8px; font-weight: 600; }
+.upload-target__tree { max-height: 220px; overflow-y: auto; padding: 6px; border: 1px solid var(--cs-border); border-radius: 12px; background: var(--cs-bg-field); }
 
 /* ===== 上传文件卡片 ===== */
 .upload-box :deep(.el-upload-list) { margin-top: 14px; }
@@ -904,21 +982,114 @@ function getFileIconColor(file) {
 }
 .upload-file-card__remove:hover { color: var(--cs-danger); transform: scale(1.15); }
 
-/* 工具栏：左搜索框、右排序+视图切换，三端统一 flex 排列 */
-.toolbar-left { display: flex; align-items: center; flex: 1; min-width: 0; }
-.toolbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.search-input { width: 240px; }
+/* ===== 页头：路径标题 + 动作（pCloud 顶部一排） ===== */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.page-head-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.crumb-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.back-circle {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--cs-border);
+  background: var(--cs-bg-container);
+  color: var(--cs-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.back-circle:hover:not(:disabled) { color: var(--cs-primary-dark); border-color: var(--cs-primary-light); background: var(--cs-primary-lighter); }
+.back-circle:disabled { opacity: 0.45; cursor: not-allowed; }
+.crumb-icon { color: var(--cs-primary); flex-shrink: 0; }
+.crumb-title :deep(.el-breadcrumb) { font-size: 21px; font-weight: 800; letter-spacing: -0.4px; white-space: nowrap; }
+.crumb-title :deep(.el-breadcrumb__inner) { color: var(--cs-text-primary); font-weight: 800; }
+.crumb-title :deep(.el-breadcrumb__inner.is-link),
+.crumb-title :deep(.el-breadcrumb__inner a) { color: var(--cs-text-secondary); font-weight: 700; transition: color 0.18s ease; }
+.crumb-title :deep(.el-breadcrumb__inner.is-link:hover),
+.crumb-title :deep(.el-breadcrumb__inner a:hover) { color: var(--cs-primary-dark); }
+.crumb-title :deep(.el-breadcrumb__separator) { color: var(--cs-text-disabled); margin: 0 7px; font-weight: 600; }
+.crumb-home { cursor: pointer; }
+.crumb-meta { display: flex; align-items: center; gap: 10px; padding-left: 44px; font-size: 12px; color: var(--cs-text-tertiary); flex-wrap: wrap; }
+.search-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 24px; padding: 0 6px 0 10px;
+  border-radius: var(--cs-radius-pill);
+  background: var(--cs-primary-lighter);
+  color: var(--cs-primary-dark);
+  font-weight: 700; font-size: 11.5px;
+}
+.search-chip .el-icon { cursor: pointer; border-radius: 50%; padding: 2px; }
+.search-chip .el-icon:hover { background: rgba(23, 190, 208, 0.18); }
 
+.page-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.page-head-actions .el-button { margin-left: 0; }
+.page-head-actions .el-button .el-icon + span { margin-left: 4px; }
+.ghost-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 100px;
+  border: 1px solid var(--cs-border);
+  background: var(--cs-bg-container);
+  color: var(--cs-text-secondary);
+  font-weight: 700;
+}
+.ghost-btn:hover { color: var(--cs-primary-dark); border-color: var(--cs-primary-light); background: var(--cs-primary-lighter); }
+.danger-ghost { color: var(--cs-danger); }
+.danger-ghost:hover { color: var(--cs-danger); border-color: rgba(250,89,93,.4); background: rgba(250,89,93,.08); }
+.upload-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 100px;
+  font-weight: 800;
+  background: var(--cs-grad-brand);
+  border: none;
+  box-shadow: 0 8px 18px rgba(23, 190, 208, 0.28);
+}
+.upload-btn:hover { box-shadow: 0 12px 24px rgba(23, 190, 208, 0.38); }
 
-/* 面包屑左侧：返回上一级 + 面包屑 */
-.breadcrumb-left { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.breadcrumb-left .back-btn { margin-right: 4px; }
-.breadcrumb-left .el-breadcrumb { white-space: nowrap; }
+/* ===== 列表条：视图说明 + 视图切换（贴在列表上方） ===== */
+.list-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.list-bar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.list-label { font-size: 11.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--cs-text-tertiary); }
+.list-selected { font-size: 12px; font-weight: 700; color: var(--cs-primary-dark); }
+.ghost-sm { height: 32px; padding: 0 14px; font-size: 12.5px; }
+.list-bar-right { display: flex; align-items: center; gap: 10px; }
 
-/* 面包屑右侧按钮 */
-.breadcrumb-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.breadcrumb-actions .el-button { margin-left: 0; }
-.breadcrumb-actions .el-button .el-icon + span { margin-left: 4px; }
+/* 视图切换：分段胶囊 */
+.view-switch {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px;
+  border-radius: 100px;
+  background: var(--cs-bg-field);
+  border: 1px solid var(--cs-border-light);
+}
+.vs-item {
+  width: 34px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 100px;
+  background: transparent;
+  color: var(--cs-text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.vs-item:hover { color: var(--cs-primary-dark); }
+.vs-item.active {
+  background: var(--cs-bg-container);
+  color: var(--cs-primary-dark);
+  box-shadow: 0 2px 8px rgba(16, 58, 76, 0.12);
+}
 
 /* 表格操作列按钮 */
 .op-actions { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
@@ -929,7 +1100,7 @@ function getFileIconColor(file) {
 /* ===== 树形表格样式优化 ===== */
 /* 展开箭头：颜色、大小、旋转动画 */
 .file-table :deep(.el-table__expand-icon) {
-  color: #c0c4cc;
+  color: var(--cs-text-disabled);
   font-size: 16px;
   width: 24px;
   height: 24px;
@@ -939,11 +1110,11 @@ function getFileIconColor(file) {
   cursor: pointer;
 }
 .file-table :deep(.el-table__expand-icon:hover) {
-  color: var(--cs-primary, #409eff);
+  color: var(--cs-primary-dark);
 }
 .file-table :deep(.el-table__expand-icon--expanded) {
   transform: rotate(90deg);
-  color: var(--cs-primary, #409eff);
+  color: var(--cs-primary);
 }
 
 /* 缩进与占位：保持对齐 */
@@ -957,18 +1128,18 @@ function getFileIconColor(file) {
 
 /* 子级行背景：区分层级 */
 .file-table :deep(.el-table__row--level-1) {
-  background-color: #fafbfc;
+  background-color: #f8fbfc;
 }
 .file-table :deep(.el-table__row--level-2) {
-  background-color: #f5f7fa;
+  background-color: #f3f9fb;
 }
 .file-table :deep(.el-table__row--level-3) {
-  background-color: #f0f2f5;
+  background-color: #eef6f8;
 }
 
 /* 行 hover 效果 */
 .file-table :deep(.el-table__body tr:hover > td) {
-  background-color: #ecf5ff !important;
+  background-color: #eafafd !important;
 }
 
 /* 文件名单元格：平滑过渡 */
@@ -989,12 +1160,13 @@ function getFileIconColor(file) {
   top: -1000px;
   left: -1000px;
   padding: 6px 14px;
-  background: var(--cs-primary, #409eff);
+  background: var(--cs-grad-brand);
   color: #fff;
-  border-radius: 6px;
+  border-radius: 100px;
   font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.35);
+  box-shadow: 0 8px 22px rgba(23, 190, 208, 0.35);
   pointer-events: none;
   z-index: 9999;
 }
@@ -1002,26 +1174,26 @@ function getFileIconColor(file) {
 /* 拖拽手柄：hover 显示，抓取光标 */
 .drag-handle {
   cursor: grab;
-  color: #dcdfe6;
+  color: var(--cs-border-strong);
   flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.2s, color 0.2s;
 }
 .file-name-cell:hover .drag-handle { opacity: 1; }
-.drag-handle:hover { color: var(--cs-primary, #409eff); }
+.drag-handle:hover { color: var(--cs-primary); }
 .drag-handle:active { cursor: grabbing; }
 
 /* 拖拽放置目标高亮：平滑进入 */
 .file-name-cell.drop-target {
-  background-color: #ecf5ff;
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 2px var(--cs-primary, #409eff);
+  background-color: #eafafd;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 2px var(--cs-primary);
   animation: dropPulse 0.6s ease infinite alternate;
 }
 
 @keyframes dropPulse {
-  from { box-shadow: inset 0 0 0 2px var(--cs-primary, #409eff); }
-  to { box-shadow: inset 0 0 0 3px var(--cs-primary, #409eff), 0 0 8px rgba(64, 158, 255, 0.3); }
+  from { box-shadow: inset 0 0 0 2px var(--cs-primary); }
+  to { box-shadow: inset 0 0 0 3px var(--cs-primary), 0 0 10px rgba(23, 190, 208, 0.3); }
 }
 
 /* 拖拽放置成功闪烁 */
