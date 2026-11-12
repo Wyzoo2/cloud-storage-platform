@@ -9,6 +9,7 @@ import App from './App.vue'
 import router from './router'
 import { permDirective } from './directives/perm'
 import './styles/index.css'
+import './styles/site.css'
 
 const app = createApp(App)
 

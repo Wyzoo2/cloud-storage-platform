@@ -1,41 +1,46 @@
 <template>
-  <div class="cs-page">
-    <div class="page-head">
-      <div class="page-head-main">
-        <div class="crumb-title">
-          <button class="back-circle" type="button" :disabled="!canGoUp" @click="goUp" title="返回上一级">
-            <el-icon :size="16"><Back /></el-icon>
-          </button>
-          <el-icon :size="17" class="crumb-icon"><FolderOpened /></el-icon>
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item v-for="item in fileStore.breadcrumb" :key="item.id">
-              <a :class="{ 'crumb-home': item.id === 0 }" @click.prevent="handleNavigate(item.id)">{{ item.id === 0 ? '我的文件' : item.name }}</a>
-            </el-breadcrumb-item>
-          </el-breadcrumb>
+  <div class="file-page">
+    <div class="page-hero">
+      <div class="site-container page-hero__inner">
+        <div class="page-hero__main">
+          <div class="page-hero__eyebrow">工作台 · 文件</div>
+          <div class="crumb-title">
+            <button class="back-circle" type="button" :disabled="!canGoUp" @click="goUp" title="返回上一级">
+              <el-icon :size="15"><Back /></el-icon>
+            </button>
+            <el-icon :size="20" class="crumb-icon"><FolderOpened /></el-icon>
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item v-for="item in fileStore.breadcrumb" :key="item.id">
+                <a :class="{ 'crumb-home': item.id === 0 }" @click.prevent="handleNavigate(item.id)">{{ item.id === 0 ? '我的文件' : item.name }}</a>
+              </el-breadcrumb-item>
+            </el-breadcrumb>
+          </div>
+          <div class="page-hero__meta">
+            <span>{{ fileStore.total }} 个项目 · 支持拖拽整理与在线预览</span>
+            <span v-if="searchText" class="search-chip">
+              搜索「{{ searchText }}」
+              <el-icon :size="12" @click="clearSearch"><Close /></el-icon>
+            </span>
+          </div>
         </div>
-        <div class="crumb-meta">
-          <span>{{ fileStore.total }} 个项目 · 支持拖拽整理与在线预览</span>
-          <span v-if="searchText" class="search-chip">
-            搜索「{{ searchText }}」
-            <el-icon :size="12" @click="clearSearch"><Close /></el-icon>
-          </span>
+        <div class="page-head-actions">
+          <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" class="ghost-btn" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
+          <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" class="ghost-btn" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
+          <el-button v-if="deleteCount > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
+          <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" type="primary" class="upload-btn" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
         </div>
-      </div>
-      <div class="page-head-actions">
-        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" class="ghost-btn" @click="handleNewFolder"><el-icon><FolderAdd /></el-icon><span>新建文件夹</span></el-button>
-        <el-button v-if="selectedRows.length > 0" v-perm="'file.modify'" class="ghost-btn" @click="openMoveDialog"><el-icon><FolderOpened /></el-icon><span>移动到（{{ selectedRows.length }}）</span></el-button>
-        <el-button v-if="deleteCount > 0 && canDeleteAny" type="danger" plain :loading="deleting" @click="handleBatchDelete"><el-icon><Delete /></el-icon><span>删除（{{ deleteCount }}）</span></el-button>
-        <el-button v-perm="'file.upload'" :disabled="enterpriseSuspended" type="primary" class="upload-btn" @click="openUploadDialog"><el-icon><UploadFilled /></el-icon><span>上传文件</span></el-button>
       </div>
     </div>
 
+    <div class="site-container file-body">
     <div class="list-bar">
       <div class="list-bar-left">
-        <span class="list-label">{{ viewLabel }}</span>
+        <el-input v-model="searchText" class="page-search" placeholder="搜索我的文件…" :prefix-icon="Search" clearable />
         <span v-if="selectedRows.length > 0" class="list-selected">已选 {{ selectedRows.length }} 项</span>
         <el-button v-if="fileStore.total > 0 && canDeleteAny" class="ghost-btn ghost-sm danger-ghost" :loading="deleting" @click="handleDeleteAll"><el-icon><Delete /></el-icon><span>删除全部文件</span></el-button>
       </div>
       <div class="list-bar-right">
+        <span class="list-label">{{ viewLabel }}</span>
         <div class="view-switch">
           <button type="button" class="vs-item" :class="{ active: viewMode === 'table' }" title="列表视图" @click="viewMode = 'table'">
             <el-icon :size="16"><List /></el-icon>
@@ -91,6 +96,8 @@
     <div class="pagination-bar">
       <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :page-sizes="[20, 50, 100]" :total="fileStore.total" layout="total, sizes, prev, pager, next" background @current-change="reload" @size-change="handleSizeChange" />
     </div>
+    </div>
+
     <el-dialog v-model="showUploadDialog" title="上传文件" width="min(520px, 92vw)" destroy-on-close @closed="onUploadDialogClosed">
       <div class="upload-target">
         <div class="upload-target__label">上传到目录（默认「全部文件」）</div>
@@ -167,7 +174,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Rank, FolderOpened } from '@element-plus/icons-vue'
+import { Search, Rank, FolderOpened } from '@element-plus/icons-vue'
 import { useFileStore } from '@/stores/file'
 import { useUserStore } from '@/stores/user'
 import { fileApi } from '@/api'
@@ -232,8 +239,8 @@ const officeContainer = ref(null)
 // 表格高度：内容区不整体滚动，表头固定、列表内部滚动（pCloud 的文件列表行为）
 const tableHeight = ref(520)
 function updateTableHeight() {
-  // 顶栏 64 + 页面上下内边距 48 + 页头/列表条/分页 ≈ 300
-  const chrome = window.innerWidth <= 768 ? 330 : 296
+  // 顶栏 74 + 页头带 + 列表条 + 分页 + 内边距 ≈ 356（移动端再多留一点）
+  const chrome = window.innerWidth <= 768 ? 402 : 356
   tableHeight.value = Math.max(300, window.innerHeight - chrome)
 }
 
@@ -982,19 +989,12 @@ function iconTile(file) {
 }
 .upload-file-card__remove:hover { color: var(--cs-danger); transform: scale(1.15); }
 
-/* ===== 页头：路径标题 + 动作（pCloud 顶部一排） ===== */
-.page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-  flex-wrap: wrap;
-}
-.page-head-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+/* ===== 页头（营销风紧凑 Hero 内的路径标题） ===== */
+.file-page { background: var(--cs-bg-container); }
+.file-body { padding-top: 18px; padding-bottom: 28px; }
 .crumb-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .back-circle {
-  width: 34px; height: 34px; flex-shrink: 0;
+  width: 32px; height: 32px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%;
   border: 1px solid var(--cs-border);
@@ -1006,15 +1006,14 @@ function iconTile(file) {
 .back-circle:hover:not(:disabled) { color: var(--cs-primary-dark); border-color: var(--cs-primary-light); background: var(--cs-primary-lighter); }
 .back-circle:disabled { opacity: 0.45; cursor: not-allowed; }
 .crumb-icon { color: var(--cs-primary); flex-shrink: 0; }
-.crumb-title :deep(.el-breadcrumb) { font-size: 21px; font-weight: 800; letter-spacing: -0.4px; white-space: nowrap; }
+.crumb-title :deep(.el-breadcrumb) { font-size: 26px; font-weight: 800; letter-spacing: -0.7px; white-space: nowrap; }
 .crumb-title :deep(.el-breadcrumb__inner) { color: var(--cs-text-primary); font-weight: 800; }
 .crumb-title :deep(.el-breadcrumb__inner.is-link),
 .crumb-title :deep(.el-breadcrumb__inner a) { color: var(--cs-text-secondary); font-weight: 700; transition: color 0.18s ease; }
 .crumb-title :deep(.el-breadcrumb__inner.is-link:hover),
 .crumb-title :deep(.el-breadcrumb__inner a:hover) { color: var(--cs-primary-dark); }
-.crumb-title :deep(.el-breadcrumb__separator) { color: var(--cs-text-disabled); margin: 0 7px; font-weight: 600; }
+.crumb-title :deep(.el-breadcrumb__separator) { color: var(--cs-text-disabled); margin: 0 8px; font-weight: 600; }
 .crumb-home { cursor: pointer; }
-.crumb-meta { display: flex; align-items: center; gap: 10px; padding-left: 44px; font-size: 12px; color: var(--cs-text-tertiary); flex-wrap: wrap; }
 .search-chip {
   display: inline-flex; align-items: center; gap: 6px;
   height: 24px; padding: 0 6px 0 10px;
@@ -1025,7 +1024,6 @@ function iconTile(file) {
 }
 .search-chip .el-icon { cursor: pointer; border-radius: 50%; padding: 2px; }
 .search-chip .el-icon:hover { background: rgba(23, 190, 208, 0.18); }
-
 .page-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .page-head-actions .el-button { margin-left: 0; }
 .page-head-actions .el-button .el-icon + span { margin-left: 4px; }
@@ -1052,7 +1050,7 @@ function iconTile(file) {
 }
 .upload-btn:hover { box-shadow: 0 12px 24px rgba(23, 190, 208, 0.38); }
 
-/* ===== 列表条：视图说明 + 视图切换（贴在列表上方） ===== */
+/* ===== 列表条：搜索 + 视图说明 + 视图切换 ===== */
 .list-bar {
   display: flex;
   align-items: center;
@@ -1062,6 +1060,9 @@ function iconTile(file) {
   flex-wrap: wrap;
 }
 .list-bar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-search { width: 264px; }
+.page-search :deep(.el-input__wrapper) { height: 38px; border-radius: 100px; padding: 0 14px; background: var(--cs-bg-field); box-shadow: none; }
+.page-search :deep(.el-input__wrapper.is-focus) { background: var(--cs-bg-container); box-shadow: 0 0 0 1px var(--cs-primary) inset, var(--cs-focus-ring); }
 .list-label { font-size: 11.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: var(--cs-text-tertiary); }
 .list-selected { font-size: 12px; font-weight: 700; color: var(--cs-primary-dark); }
 .ghost-sm { height: 32px; padding: 0 14px; font-size: 12.5px; }

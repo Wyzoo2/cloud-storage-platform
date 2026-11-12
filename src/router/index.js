@@ -5,6 +5,8 @@ import { ADMIN_SIDE_PERMS } from '@/constants/menus'
 
 // meta.perm 声明该路由需要的权限点（数组=任一命中）；守卫按 /me/context 的 perms 判定
 const routes = [
+  // 对外介绍页（未登录时默认落地页，结构参照 pCloud.com）
+  { path: '/welcome', name: 'Landing', component: () => import('@/views/marketing/Landing.vue'), meta: { requiresAuth: false } },
   { path: '/login', name: 'Login', component: () => import('@/views/login/LoginView.vue'), meta: { requiresAuth: false } },
   { path: '/forbidden', name: 'Forbidden', component: () => import('@/views/error/Forbidden.vue'), meta: { title: '无权访问' } },
   {
@@ -58,7 +60,8 @@ router.beforeEach(async to => {
 
   const token = localStorage.getItem('cs-token')
   if (!token) {
-    return { path: '/login', query: to.fullPath && to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
+    // 未登录先去对外介绍页，而不是直接把人丢到登录框
+    return { path: '/welcome', query: to.fullPath && to.fullPath !== '/' ? { redirect: to.fullPath } : {} }
   }
 
   const perm = usePermissionStore()

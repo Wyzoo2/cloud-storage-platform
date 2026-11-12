@@ -250,7 +250,14 @@ a:hover { color: var(--cs-primary); }
   transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
 .cs-card:hover { box-shadow: var(--cs-shadow); }
-.cs-page { padding: 24px; min-height: calc(100vh - var(--cs-header-height)); animation: cs-page-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+.cs-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 24px 48px;
+  min-height: calc(100vh - var(--site-nav-h, 74px));
+  animation: cs-page-enter 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
 /* pCloud 式内容面板：表格/列表直接铺满面板，面板只负责圆角与描边 */
 .cs-surface {
   background: var(--cs-bg-container);
